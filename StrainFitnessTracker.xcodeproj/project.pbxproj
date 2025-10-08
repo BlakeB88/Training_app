@@ -6,6 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		DA0F40672E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0F40652E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift */; };
+		DA0F40682E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0F40662E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift */; };
+		DAE732FD2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE732FA2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift */; };
+		DAE733002E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE732F92E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataClass.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		DAE732262E8E1ADF00BA3CA2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,14 +31,31 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		DA0F40652E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutRecordEntity+CoreDataClass.swift"; sourceTree = "<group>"; };
+		DA0F40662E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutRecordEntity+CoreDataProperties.swift"; sourceTree = "<group>"; };
 		DAE732182E8E1ADD00BA3CA2 /* StrainFitnessTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StrainFitnessTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAE732252E8E1ADF00BA3CA2 /* StrainFitnessTrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StrainFitnessTrackerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAE7322F2E8E1ADF00BA3CA2 /* StrainFitnessTrackerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StrainFitnessTrackerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DAE732F92E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyMetricsEntity+CoreDataClass.swift"; sourceTree = "<group>"; };
+		DAE732FA2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyMetricsEntity+CoreDataProperties.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DAE732F82E95E39C00BA3CA2 /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTracker" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Core/Persistence/DataModel.xcdatamodeld,
+			);
+			target = DAE732172E8E1ADD00BA3CA2 /* StrainFitnessTracker */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		DAE7321A2E8E1ADD00BA3CA2 /* StrainFitnessTracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DAE732F82E95E39C00BA3CA2 /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTracker" target */,
+			);
 			path = StrainFitnessTracker;
 			sourceTree = "<group>";
 		};
@@ -75,6 +99,10 @@
 		DAE7320F2E8E1ADD00BA3CA2 = {
 			isa = PBXGroup;
 			children = (
+				DA0F40652E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift */,
+				DA0F40662E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift */,
+				DAE732F92E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataClass.swift */,
+				DAE732FA2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift */,
 				DAE7321A2E8E1ADD00BA3CA2 /* StrainFitnessTracker */,
 				DAE732282E8E1ADF00BA3CA2 /* StrainFitnessTrackerTests */,
 				DAE732322E8E1ADF00BA3CA2 /* StrainFitnessTrackerUITests */,
@@ -236,6 +264,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DAE732FD2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift in Sources */,
+				DA0F40672E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift in Sources */,
+				DA0F40682E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift in Sources */,
+				DAE733002E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataClass.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -394,6 +426,8 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Fit Tracker";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "StrainFitnessTracker needs access to your health data to calculate your daily strain from workouts and recovery metrics from sleep, heart rate, and HRV data.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -409,18 +443,19 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ex.StrainFitnessTracker;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blake.StrainFitnessTracker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = 1;
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Debug;
@@ -436,6 +471,8 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Fit Tracker";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "StrainFitnessTracker needs access to your health data to calculate your daily strain from workouts and recovery metrics from sleep, heart rate, and HRV data.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -451,18 +488,19 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = ex.StrainFitnessTracker;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blake.StrainFitnessTracker;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2,7";
+				TARGETED_DEVICE_FAMILY = 1;
 				XROS_DEPLOYMENT_TARGET = 26.0;
 			};
 			name = Release;
