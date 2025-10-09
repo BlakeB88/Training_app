@@ -1,19 +1,24 @@
+//
+//  StrainDetailView.swift
+//  StrainFitnessTracker
+//
+//  Updated: 10/8/25 - Added collapsible date selector and dark mode support
+//
+
 import SwiftUI
 import UIKit
 
 struct StrainDetailView: View {
     @StateObject private var viewModel = StrainViewModel()
     @State private var selectedDate = Date()
+    @State private var isDateSelectorExpanded = false
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Date picker
-                DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(12)
+                // Collapsible Date picker
+                collapsibleDatePicker
                 
                 // Strain ring
                 StrainRingView(strain: viewModel.currentStrain)
@@ -41,14 +46,65 @@ struct StrainDetailView: View {
         }
     }
     
+    // MARK: - Collapsible Date Picker
+    private var collapsibleDatePicker: some View {
+        VStack(spacing: 0) {
+            // Header (always visible)
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    isDateSelectorExpanded.toggle()
+                }
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(selectedDate.formatted(.dateTime.weekday(.wide)))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Text(selectedDate.formatted(.dateTime.month().day().year()))
+                            .font(.title3.bold())
+                            .foregroundColor(.primary)
+                    }
+                    
+                    Spacer()
+                    
+                    HStack(spacing: 8) {
+                        Text("Change Date")
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                        
+                        Image(systemName: "chevron.down")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                            .rotationEffect(.degrees(isDateSelectorExpanded ? 180 : 0))
+                    }
+                }
+                .padding()
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            
+            // Expandable date picker
+            if isDateSelectorExpanded {
+                DatePicker("Date", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .padding()
+                    .background(Color(uiColor: .secondarySystemGroupedBackground))
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.05), radius: 5, x: 0, y: 2)
+    }
+    
     private var strainBreakdownCard: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Strain Breakdown")
                 .font(.headline)
             
             VStack(spacing: 12) {
-                // Note: These properties don't exist in StrainViewModel
-                // You'll need to add them or calculate from workouts
                 StrainComponentRow(
                     title: "Total Strain",
                     value: viewModel.currentStrain,
@@ -65,8 +121,9 @@ struct StrainDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .cornerRadius(12)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.05), radius: 5, x: 0, y: 2)
     }
     
     private func strainColor(_ strain: Double) -> Color {

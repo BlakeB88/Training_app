@@ -3,6 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/1/25.
+//  Updated: 10/8/25 - Added Dashboard as main tab
 //
 
 import SwiftUI
@@ -62,9 +63,16 @@ struct ContentView: View {
     
     private var mainTabView: some View {
         TabView {
+            // Dashboard Tab (Main Overview)
+            DashboardView()
+                .tabItem {
+                    Label("Dashboard", systemImage: "chart.bar.fill")
+                }
+            
             // Strain Tab
             NavigationStack {
                 StrainDetailView()
+                    .navigationTitle("Strain")
             }
             .tabItem {
                 Label("Strain", systemImage: "flame.fill")
@@ -73,14 +81,25 @@ struct ContentView: View {
             // Recovery Tab
             NavigationStack {
                 RecoveryDetailView()
+                    .navigationTitle("Recovery")
             }
             .tabItem {
                 Label("Recovery", systemImage: "heart.fill")
             }
             
-            // Profile/Settings Tab
+            // Stress Tab
+            NavigationStack {
+                StressMonitorView()
+                    .navigationTitle("Stress")
+            }
+            .tabItem {
+                Label("Stress", systemImage: "waveform.path")
+            }
+            
+            // Settings Tab
             NavigationStack {
                 SettingsView()
+                    .navigationTitle("Settings")
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
@@ -117,29 +136,6 @@ struct PermissionInfoRow: View {
                 .frame(width: 30)
             Text(text)
         }
-    }
-}
-
-// Simple Settings View
-struct AppSettingsView: View {
-    var body: some View {
-        List {
-            Section("About") {
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text("1.0.0")
-                        .foregroundColor(.secondary)
-                }
-            }
-            
-            Section("Health Data") {
-                Button("Refresh Data") {
-                    // Add refresh logic
-                }
-            }
-        }
-        .navigationTitle("Settings")
     }
 }
 

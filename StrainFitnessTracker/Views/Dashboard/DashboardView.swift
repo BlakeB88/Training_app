@@ -3,6 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/8/25.
+//  Updated: Dark/Light mode support
 //
 
 import SwiftUI
@@ -12,18 +13,20 @@ struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
     @State private var showingSettings = false
     @State private var selectedDate = Date()
+    @State private var isDateSelectorExpanded = true
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         NavigationView {
             ZStack {
-                // Background
-                Color(red: 0.95, green: 0.95, blue: 0.97)
+                // Background - adapts to light/dark mode
+                Color(uiColor: .systemGroupedBackground)
                     .ignoresSafeArea()
 
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Date selector
-                        dateSelector
+                        // Collapsible Date selector
+                        collapsibleDateSelector
 
                         if viewModel.isLoading {
                             loadingView
@@ -76,51 +79,110 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Date Selector
-    private var dateSelector: some View {
-        HStack {
+    // MARK: - Collapsible Date Selector
+    private var collapsibleDateSelector: some View {
+        VStack(spacing: 0) {
+            // Header (always visible)
             Button {
-                withAnimation {
-                    selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    isDateSelectorExpanded.toggle()
                 }
             } label: {
-                Image(systemName: "chevron.left")
-                    .font(.title3)
-                    .foregroundColor(.primary)
-                    .frame(width: 44, height: 44)
-            }
-            .disabled(selectedDate <= Calendar.current.date(byAdding: .day, value: -7, to: Date())!)
-
-            Spacer()
-
-            VStack(spacing: 2) {
-                Text(selectedDate.formatted(.dateTime.weekday(.wide)))
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-
-                Text(selectedDate.formatted(.dateTime.month().day()))
-                    .font(.title2.bold())
-                    .foregroundColor(.primary)
-            }
-
-            Spacer()
-
-            Button {
-                withAnimation {
-                    selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(selectedDate.formatted(.dateTime.weekday(.wide)))
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Text(selectedDate.formatted(.dateTime.month().day().year()))
+                            .font(.title3.bold())
+                            .foregroundColor(.primary)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.down")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                        .rotationEffect(.degrees(isDateSelectorExpanded ? 180 : 0))
                 }
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.title3)
-                    .foregroundColor(.primary)
-                    .frame(width: 44, height: 44)
+                .padding()
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
+                .contentShape(Rectangle())
             }
-            .disabled(selectedDate >= Date().startOfDay)
+            .buttonStyle(.plain)
+            
+            // Expandable navigation controls
+            if isDateSelectorExpanded {
+                VStack(spacing: 12) {
+                    Divider()
+                        .padding(.horizontal)
+                    
+                    HStack(spacing: 16) {
+                        Button {
+                            withAnimation {
+                                selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "chevron.left")
+                                Text("Previous")
+                                    .font(.subheadline)
+                            }
+                            .foregroundColor(selectedDate <= Calendar.current.date(byAdding: .day, value: -7, to: Date())! ? .gray : .blue)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
+                        .disabled(selectedDate <= Calendar.current.date(byAdding: .day, value: -7, to: Date())!)
+                        
+                        Spacer()
+                        
+                        Button {
+                            withAnimation {
+                                selectedDate = Date()
+                            }
+                        } label: {
+                            Text("Today")
+                                .font(.subheadline.bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 10)
+                                .background(Color.blue)
+                                .clipShape(Capsule())
+                        }
+                        
+                        Spacer()
+                        
+                        Button {
+                            withAnimation {
+                                selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text("Next")
+                                    .font(.subheadline)
+                                Image(systemName: "chevron.right")
+                            }
+                            .foregroundColor(selectedDate >= Date().startOfDay ? .gray : .blue)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
+                        .disabled(selectedDate >= Date().startOfDay)
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 12)
+                }
+                .background(Color(uiColor: .secondarySystemGroupedBackground))
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
-        .padding()
-        .background(.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.05), radius: 5, x: 0, y: 2)
     }
 
     // MARK: - Main Content
@@ -182,9 +244,9 @@ struct DashboardView: View {
                 .padding(.horizontal)
         }
         .padding()
-        .background(.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 10, x: 0, y: 4)
     }
 
     private var strainDescription: String {
@@ -325,9 +387,9 @@ struct DashboardView: View {
             }
         }
         .padding()
-        .background(.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.1), radius: 10, x: 0, y: 4)
     }
 
     // MARK: - Loading View
@@ -419,6 +481,7 @@ struct QuickStatCard: View {
     let label: String
     let value: String
     let color: Color
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         VStack(spacing: 8) {
@@ -436,14 +499,15 @@ struct QuickStatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.05), radius: 5, x: 0, y: 2)
     }
 }
 
 struct WorkoutRowView: View {
     let workout: WorkoutSummary
+    @Environment(\.colorScheme) var colorScheme
 
     var body: some View {
         HStack(spacing: 12) {
@@ -492,9 +556,9 @@ struct WorkoutRowView: View {
             }
         }
         .padding()
-        .background(.white)
+        .background(Color(uiColor: .secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.05), radius: 5, x: 0, y: 2)
     }
 
     private func strainColor(_ strain: Double) -> Color {
