@@ -80,7 +80,7 @@ struct ContentView: View {
             
             // Profile/Settings Tab
             NavigationStack {
-                AppSettingsView()
+                SettingsView()
             }
             .tabItem {
                 Label("Settings", systemImage: "gear")
