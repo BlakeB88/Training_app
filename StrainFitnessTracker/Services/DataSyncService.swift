@@ -3,6 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
+//  Updated: 10/9/25 - Fixed type mismatches
 //
 
 import Foundation
@@ -164,29 +165,35 @@ class DataSyncService: ObservableObject {
         // Calculate recovery
         var recovery: Double?
         var recoveryComponents: RecoveryComponents?
+        var baselineMetrics: BaselineMetrics?
         
         let historicalMetrics = try repository.fetchRecentDailyMetrics(days: 28)
-        if let baseline = BaselineCalculator.calculateBaselines(from: historicalMetrics, forDate: date) {
-            recovery = RecoveryCalculator.calculateRecoveryScore(
-                hrvCurrent: hrvAverage,
-                hrvBaseline: baseline.hrvBaseline,
-                rhrCurrent: restingHR,
-                rhrBaseline: baseline.rhrBaseline,
-                sleepDuration: sleepDuration
-            )
+        if !historicalMetrics.isEmpty {
+            // Calculate baselines from SimpleDailyMetrics
+            baselineMetrics = calculateBaselinesFromSimpleMetrics(historicalMetrics, forDate: date)
             
-            recoveryComponents = RecoveryCalculator.recoveryComponents(
-                hrvCurrent: hrvAverage,
-                hrvBaseline: baseline.hrvBaseline,
-                rhrCurrent: restingHR,
-                rhrBaseline: baseline.rhrBaseline,
-                sleepDuration: sleepDuration,
-                respiratoryRate: nil
-            )
+            if let baseline = baselineMetrics {
+                recovery = RecoveryCalculator.calculateRecoveryScore(
+                    hrvCurrent: hrvAverage,
+                    hrvBaseline: baseline.hrvBaseline,
+                    rhrCurrent: restingHR,
+                    rhrBaseline: baseline.rhrBaseline,
+                    sleepDuration: sleepDuration
+                )
+                
+                recoveryComponents = RecoveryCalculator.recoveryComponents(
+                    hrvCurrent: hrvAverage,
+                    hrvBaseline: baseline.hrvBaseline,
+                    rhrCurrent: restingHR,
+                    rhrBaseline: baseline.rhrBaseline,
+                    sleepDuration: sleepDuration,
+                    respiratoryRate: nil
+                )
+            }
         }
         
-        // Create and save daily metrics
-        let dailyMetrics = DailyMetrics(
+        // Create and save daily metrics using SimpleDailyMetrics
+        let dailyMetrics = SimpleDailyMetrics(
             date: dayStart,
             strain: totalStrain,
             recovery: recovery,
@@ -196,7 +203,8 @@ class DataSyncService: ObservableObject {
             sleepStart: nil,
             sleepEnd: nil,
             hrvAverage: hrvAverage,
-            restingHeartRate: restingHR
+            restingHeartRate: restingHR,
+            baselineMetrics: baselineMetrics
         )
         
         try repository.saveDailyMetrics(dailyMetrics)
@@ -221,29 +229,35 @@ class DataSyncService: ObservableObject {
         // Calculate recovery
         var recovery: Double?
         var recoveryComponents: RecoveryComponents?
+        var baselineMetrics: BaselineMetrics?
         
         let historicalMetrics = try repository.fetchRecentDailyMetrics(days: 28)
-        if let baseline = BaselineCalculator.calculateBaselines(from: historicalMetrics, forDate: date) {
-            recovery = RecoveryCalculator.calculateRecoveryScore(
-                hrvCurrent: hrvAverage,
-                hrvBaseline: baseline.hrvBaseline,
-                rhrCurrent: restingHR,
-                rhrBaseline: baseline.rhrBaseline,
-                sleepDuration: sleepDuration
-            )
+        if !historicalMetrics.isEmpty {
+            // Calculate baselines from SimpleDailyMetrics
+            baselineMetrics = calculateBaselinesFromSimpleMetrics(historicalMetrics, forDate: date)
             
-            recoveryComponents = RecoveryCalculator.recoveryComponents(
-                hrvCurrent: hrvAverage,
-                hrvBaseline: baseline.hrvBaseline,
-                rhrCurrent: restingHR,
-                rhrBaseline: baseline.rhrBaseline,
-                sleepDuration: sleepDuration,
-                respiratoryRate: nil
-            )
+            if let baseline = baselineMetrics {
+                recovery = RecoveryCalculator.calculateRecoveryScore(
+                    hrvCurrent: hrvAverage,
+                    hrvBaseline: baseline.hrvBaseline,
+                    rhrCurrent: restingHR,
+                    rhrBaseline: baseline.rhrBaseline,
+                    sleepDuration: sleepDuration
+                )
+                
+                recoveryComponents = RecoveryCalculator.recoveryComponents(
+                    hrvCurrent: hrvAverage,
+                    hrvBaseline: baseline.hrvBaseline,
+                    rhrCurrent: restingHR,
+                    rhrBaseline: baseline.rhrBaseline,
+                    sleepDuration: sleepDuration,
+                    respiratoryRate: nil
+                )
+            }
         }
         
-        // Create metrics with zero strain
-        let dailyMetrics = DailyMetrics(
+        // Create metrics with zero strain using SimpleDailyMetrics
+        let dailyMetrics = SimpleDailyMetrics(
             date: dayStart,
             strain: 0,
             recovery: recovery,
@@ -286,7 +300,7 @@ class DataSyncService: ObservableObject {
             workoutType: workout.workoutActivityType,
             startDate: workout.startDate,
             endDate: workout.endDate,
-            duration: workout.duration / 60.0,
+            duration: workout.duration,
             distance: workout.totalDistance?.doubleValue(for: .meter()),
             calories: calories,
             averageHeartRate: avgHR,
@@ -301,5 +315,56 @@ class DataSyncService: ObservableObject {
     private func updateLastSyncDate() {
         lastSyncDate = Date()
         userDefaults.set(lastSyncDate, forKey: lastSyncKey)
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Calculate baselines from SimpleDailyMetrics (instead of using BaselineCalculator which expects DailyMetrics)
+    private func calculateBaselinesFromSimpleMetrics(_ metrics: [SimpleDailyMetrics], forDate date: Date) -> BaselineMetrics? {
+        guard !metrics.isEmpty else { return nil }
+        
+        // Filter out metrics without required data
+        let validMetrics = metrics.filter { $0.hrvAverage != nil && $0.restingHeartRate != nil }
+        guard validMetrics.count >= AppConstants.Baseline.minimumDaysForBaseline else { return nil }
+        
+        // Calculate HRV baseline
+        let hrvValues = validMetrics.compactMap { $0.hrvAverage }
+        let hrvBaseline = hrvValues.isEmpty ? nil : hrvValues.reduce(0.0, +) / Double(hrvValues.count)
+        let hrvStdDev = hrvValues.isEmpty ? nil : standardDeviation(hrvValues)
+        
+        // Calculate RHR baseline
+        let rhrValues = validMetrics.compactMap { $0.restingHeartRate }
+        let rhrBaseline = rhrValues.isEmpty ? nil : rhrValues.reduce(0.0, +) / Double(rhrValues.count)
+        let rhrStdDev = rhrValues.isEmpty ? nil : standardDeviation(rhrValues)
+        
+        // Calculate acute strain (last 7 days)
+        let recentMetrics = metrics.suffix(7)
+        let acuteStrain = recentMetrics.isEmpty ? nil : recentMetrics.reduce(0.0) { $0 + $1.strain } / Double(recentMetrics.count)
+        
+        // Calculate chronic strain (all available, up to 28 days)
+        let chronicStrain = metrics.isEmpty ? nil : metrics.reduce(0.0) { $0 + $1.strain } / Double(metrics.count)
+        
+        return BaselineMetrics(
+            hrvBaseline: hrvBaseline,
+            hrvStandardDeviation: hrvStdDev,
+            rhrBaseline: rhrBaseline,
+            rhrStandardDeviation: rhrStdDev,
+            acuteStrain: acuteStrain,
+            chronicStrain: chronicStrain,
+            respiratoryRateBaseline: nil,
+            calculatedDate: date,
+            daysOfData: validMetrics.count
+        )
+    }
+    
+    /// Calculate standard deviation
+    private func standardDeviation(_ values: [Double]) -> Double {
+        guard values.count > 1 else { return 0 }
+        
+        let mean = values.reduce(0.0, +) / Double(values.count)
+        let squaredDifferences = values.map { pow($0 - mean, 2) }
+        let variance = squaredDifferences.reduce(0.0, +) / Double(values.count - 1)
+        
+        return sqrt(variance)
     }
 }

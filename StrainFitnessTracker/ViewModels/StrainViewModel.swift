@@ -3,6 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
+//  Updated: 10/9/25 - Fixed to use SimpleDailyMetrics from repository
 //
 
 import Foundation
@@ -14,9 +15,9 @@ class StrainViewModel: ObservableObject {
     
     // MARK: - Published Properties
     @Published var selectedDate: Date = Date()
-    @Published var dailyMetrics: DailyMetrics?
-    @Published var weeklyMetrics: [DailyMetrics] = []
-    @Published var monthlyMetrics: [DailyMetrics] = []
+    @Published var dailyMetrics: SimpleDailyMetrics?
+    @Published var weeklyMetrics: [SimpleDailyMetrics] = []
+    @Published var monthlyMetrics: [SimpleDailyMetrics] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -26,7 +27,8 @@ class StrainViewModel: ObservableObject {
     }
     
     var strainLevel: String {
-        dailyMetrics?.strainLevel ?? "No Data"
+        guard let strain = dailyMetrics?.strain else { return "No Data" }
+        return strain.strainLevel()
     }
     
     var workouts: [WorkoutSummary] {
@@ -34,7 +36,13 @@ class StrainViewModel: ObservableObject {
     }
     
     var workoutBreakdown: [(type: String, count: Int, totalStrain: Double)] {
-        dailyMetrics?.workoutBreakdown() ?? []
+        guard let workouts = dailyMetrics?.workouts else { return [] }
+        let grouped = Dictionary(grouping: workouts) { $0.workoutType }
+        
+        return grouped.map { type, workouts in
+            let totalStrain = workouts.reduce(0.0) { $0 + $1.strain }
+            return (type.name, workouts.count, totalStrain)
+        }.sorted { $0.totalStrain > $1.totalStrain }
     }
     
     var weeklyAverageStrain: Double? {
@@ -48,11 +56,11 @@ class StrainViewModel: ObservableObject {
     }
     
     var acwr: Double? {
-        dailyMetrics?.acwr
+        dailyMetrics?.baselineMetrics?.acwr
     }
     
     var acwrStatus: ACWRStatus? {
-        dailyMetrics?.acwrStatus
+        dailyMetrics?.baselineMetrics?.acwrStatus()
     }
     
     // MARK: - Dependencies
@@ -81,17 +89,8 @@ class StrainViewModel: ObservableObject {
             let monthStart = Calendar.current.date(byAdding: .day, value: -27, to: selectedDate)!
             monthlyMetrics = try repository.fetchDailyMetrics(from: monthStart, to: selectedDate)
             
-            // Calculate baseline if we have enough data
-            if let metrics = dailyMetrics, monthlyMetrics.count >= 7 {
-                if let baseline = BaselineCalculator.calculateBaselines(
-                    from: monthlyMetrics,
-                    forDate: selectedDate
-                ) {
-                    let updatedMetrics = metrics.withUpdatedBaseline(baseline)
-                    try repository.saveDailyMetrics(updatedMetrics)
-                    dailyMetrics = updatedMetrics
-                }
-            }
+            // Note: Baseline is now calculated during sync in DataSyncService
+            // No need to recalculate here
             
         } catch {
             errorMessage = "Failed to load data: \(error.localizedDescription)"
@@ -137,5 +136,3 @@ extension StrainViewModel {
         monthlyMetrics.map { ChartDataPoint(date: $0.date, value: $0.strain) }
     }
 }
-
-

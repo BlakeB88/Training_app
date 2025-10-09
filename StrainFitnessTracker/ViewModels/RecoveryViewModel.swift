@@ -3,6 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
+//  Updated: 10/9/25 - Fixed to use SimpleDailyMetrics from repository
 //
 
 import Foundation
@@ -13,8 +14,8 @@ class RecoveryViewModel: ObservableObject {
     
     // MARK: - Published Properties
     @Published var selectedDate: Date = Date()
-    @Published var dailyMetrics: DailyMetrics?
-    @Published var weeklyMetrics: [DailyMetrics] = []
+    @Published var dailyMetrics: SimpleDailyMetrics?
+    @Published var weeklyMetrics: [SimpleDailyMetrics] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     
@@ -24,7 +25,8 @@ class RecoveryViewModel: ObservableObject {
     }
     
     var recoveryLevel: String? {
-        dailyMetrics?.recoveryLevel
+        guard let recovery = currentRecovery else { return nil }
+        return recovery.recoveryLevel()
     }
     
     var recoveryComponents: RecoveryComponents? {
@@ -51,7 +53,7 @@ class RecoveryViewModel: ObservableObject {
     }
     
     var hasRecoveryData: Bool {
-        dailyMetrics?.hasRecoveryData ?? false
+        dailyMetrics?.recovery != nil
     }
     
     var weeklyAverageRecovery: Double? {
