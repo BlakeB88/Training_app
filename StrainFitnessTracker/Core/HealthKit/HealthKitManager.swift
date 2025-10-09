@@ -1,8 +1,9 @@
 //
-//  HealthKitManager.swift
+//  HealthKitManager.swift (UPDATED WITH STRESS MONITORING)
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/1/25.
+//  Updated: 10/8/25 - Added stress monitoring capabilities
 //
 
 import Foundation
@@ -237,6 +238,73 @@ class HealthKitManager: ObservableObject {
         }
     }
     
+    // MARK: - NEW: Stress Monitoring Heart Rate Queries
+    
+    /// Fetch continuous heart rate data for stress monitoring
+    func fetchContinuousHeartRate(from startDate: Date, to endDate: Date) async throws -> [(timestamp: Date, heartRate: Double)] {
+        let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: heartRateType,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                let heartRateData = (samples as? [HKQuantitySample])?.map { sample in
+                    (
+                        timestamp: sample.startDate,
+                        heartRate: sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                    )
+                } ?? []
+                
+                continuation.resume(returning: heartRateData)
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+    
+    /// Fetch the most recent heart rate reading
+    func fetchLatestHeartRate() async throws -> (timestamp: Date, heartRate: Double)? {
+        let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate)!
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: heartRateType,
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                guard let sample = samples?.first as? HKQuantitySample else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                
+                let result = (
+                    timestamp: sample.startDate,
+                    heartRate: sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+                )
+                
+                continuation.resume(returning: result)
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+    
     // MARK: - Sleep Queries
     
     func fetchLastNightSleep() async throws -> HKCategorySample? {
@@ -266,7 +334,6 @@ class HealthKitManager: ObservableObject {
                     return
                 }
                 
-                // Use the new sleep analysis values
                 let sleepSample = (samples as? [HKCategorySample])?.first {
                     $0.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue ||
                     $0.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue ||
@@ -297,7 +364,6 @@ class HealthKitManager: ObservableObject {
                     return
                 }
                 
-                // Use the new sleep analysis values
                 let sleepSamples = (samples as? [HKCategorySample])?.filter {
                     $0.value == HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue ||
                     $0.value == HKCategoryValueSleepAnalysis.asleepCore.rawValue ||
@@ -393,6 +459,28 @@ class HealthKitManager: ObservableObject {
             healthStore.execute(query)
             healthStore.enableBackgroundDelivery(for: quantityType, frequency: .immediate) { _, _ in }
         }
+    }
+    
+    // MARK: - NEW: Stress Monitoring Observer
+    
+    /// Start observing heart rate changes for real-time stress monitoring
+    func startObservingHeartRate(handler: @escaping () -> Void) {
+        guard let heartRateType = HKQuantityType.quantityType(forIdentifier: .heartRate) else { return }
+        
+        let query = HKObserverQuery(sampleType: heartRateType, predicate: nil) { _, completionHandler, error in
+            if error != nil {
+                completionHandler()
+                return
+            }
+            
+            DispatchQueue.main.async {
+                handler()
+            }
+            completionHandler()
+        }
+        
+        healthStore.execute(query)
+        healthStore.enableBackgroundDelivery(for: heartRateType, frequency: .immediate) { _, _ in }
     }
 }
 
