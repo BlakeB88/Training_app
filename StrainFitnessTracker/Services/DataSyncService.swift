@@ -45,19 +45,25 @@ class DataSyncService: ObservableObject {
     
     /// Quick sync - only today's data
     func quickSync() async {
-        guard !isSyncing else { return }
+        guard !isSyncing else {
+            print("⚠️ Already syncing, skipping quickSync")
+            return
+        }
         
+        print("🔄 Starting quick sync for today...")
         isSyncing = true
         syncError = nil
         
         do {
             let today = Date().startOfDay
+            print("📅 Syncing: \(today.formatted(.dateTime.month().day().year()))")
             try await syncDay(today)
             
             updateLastSyncDate()
+            print("✅ Quick sync completed successfully")
         } catch {
             syncError = error
-            print("Quick sync error: \(error)")
+            print("❌ Quick sync error: \(error.localizedDescription)")
         }
         
         isSyncing = false
@@ -113,10 +119,14 @@ class DataSyncService: ObservableObject {
         let dayStart = date.startOfDay
         let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)!
         
+        print("   📊 Fetching workouts for \(dayStart.formatted(.dateTime.month().day()))...")
+        
         // Fetch workouts
         let hkWorkouts = try await workoutQuery.fetchWorkouts(from: dayStart, to: dayEnd)
+        print("   Found \(hkWorkouts.count) workouts")
         
         guard !hkWorkouts.isEmpty else {
+            print("   ⚠️ No workouts found, syncing recovery data only...")
             // No workouts, but still sync recovery data
             try await syncRecoveryOnly(for: date)
             return
