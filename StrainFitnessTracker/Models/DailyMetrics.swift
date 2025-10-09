@@ -2,214 +2,290 @@
 //  DailyMetrics.swift
 //  StrainFitnessTracker
 //
-//  Created by Blake Burnley on 10/7/25.
+//  Data models for dashboard metrics
 //
 
 import Foundation
-import HealthKit
 
-/// Represents all metrics for a single day
-struct DailyMetrics {
-    
-    // MARK: - Identification
-    let id: UUID
+// MARK: - Core Metrics
+struct DailyMetrics: Identifiable {
+    let id = UUID()
     let date: Date
     
-    // MARK: - Primary Metrics
-    let strain: Double
-    let recovery: Double?
+    // Primary Metrics
+    var sleepScore: Double // 0-100
+    var recoveryScore: Double // 0-100
+    var strainScore: Double // 0-21
     
-    // MARK: - Recovery Components
-    let recoveryComponents: RecoveryComponents?
+    // Sleep Metrics
+    var sleepDuration: TimeInterval // in seconds
+    var restorativeSleepPercentage: Double // 0-100
+    var sleepEfficiency: Double // 0-100
+    var sleepConsistency: Double // 0-100
+    var timeInBed: TimeInterval
+    var sleepDebt: TimeInterval
+    var respiratoryRate: Double // breaths per minute
     
-    // MARK: - Workouts
-    let workouts: [WorkoutSummary]
+    // Activity Metrics
+    var calories: Int
+    var steps: Int
+    var averageHeartRate: Int
+    var restingHeartRate: Int
+    var vo2Max: Double
     
-    // MARK: - Sleep Data
-    let sleepDuration: Double? // in hours
-    let sleepStart: Date?
-    let sleepEnd: Date?
+    // Stress
+    var currentStress: Double // 0-3
+    var stressHistory: [StressDataPoint]
     
-    // MARK: - Heart Rate Data
-    let hrvAverage: Double?
-    let restingHeartRate: Double?
+    // Activities
+    var activities: [Activity]
     
-    // MARK: - Baseline Comparison
-    let baselineMetrics: BaselineMetrics?
+    // Health Monitor Status
+    var healthMetricsInRange: Int
+    var totalHealthMetrics: Int
+}
+
+// MARK: - Activity
+struct Activity: Identifiable {
+    let id = UUID()
+    let type: ActivityType
+    let startTime: Date
+    let endTime: Date
+    let strain: Double?
+    let duration: TimeInterval
     
-    // MARK: - Metadata
-    let lastUpdated: Date
-    
-    // MARK: - Computed Properties
-    
-    var dateFormatted: String {
-        return date.formattedRelative()
+    enum ActivityType: String {
+        case sleep = "SLEEP"
+        case swimming = "SWIMMING"
+        case running = "RUNNING"
+        case cycling = "CYCLING"
+        case workout = "WORKOUT"
+        case walking = "WALKING"
+        
+        var icon: String {
+            switch self {
+            case .sleep: return "moon.fill"
+            case .swimming: return "figure.pool.swim"
+            case .running: return "figure.run"
+            case .cycling: return "figure.outdoor.cycle"
+            case .workout: return "figure.strengthtraining.traditional"
+            case .walking: return "figure.walk"
+            }
+        }
+        
+        var color: String {
+            switch self {
+            case .sleep: return "SleepBlue"
+            case .swimming: return "AccentBlue"
+            case .running, .cycling, .workout, .walking: return "StrainBlue"
+            }
+        }
     }
     
-    var strainFormatted: String {
-        return strain.formattedStrain()
+    var formattedDuration: String {
+        let hours = Int(duration) / 3600
+        let minutes = (Int(duration) % 3600) / 60
+        return "\(hours):\(String(format: "%02d", minutes))"
     }
     
-    var strainLevel: String {
-        return strain.strainLevel()
-    }
-    
-    var recoveryFormatted: String? {
-        guard let rec = recovery else { return nil }
-        return rec.formattedRecovery()
-    }
-    
-    var recoveryLevel: String? {
-        guard let rec = recovery else { return nil }
-        return rec.recoveryLevel()
-    }
-    
-    var workoutCount: Int {
-        return workouts.count
-    }
-    
-    var totalWorkoutDuration: TimeInterval {
-        return workouts.reduce(0) { $0 + $1.duration }
-    }
-    
-    var totalCalories: Double {
-        return workouts.reduce(0) { $0 + $1.calories }
-    }
-    
-    var totalDistance: Double? {
-        let distances = workouts.compactMap { $0.distance }
-        guard !distances.isEmpty else { return nil }
-        return distances.reduce(0, +)
-    }
-    
-    var hasRecoveryData: Bool {
-        return recovery != nil
-    }
-    
-    var hasWorkouts: Bool {
-        return !workouts.isEmpty
-    }
-    
-    var isComplete: Bool {
-        return hasWorkouts && hasRecoveryData
-    }
-    
-    var acwr: Double? {
-        return baselineMetrics?.acwr
-    }
-    
-    var acwrFormatted: String? {
-        guard let ratio = acwr else { return nil }
-        return ratio.formattedACWR()
-    }
-    
-    var acwrStatus: ACWRStatus? {
-        return baselineMetrics?.acwrStatus()
-    }
-    
-    // MARK: - Initialization
-    init(
-        id: UUID = UUID(),
-        date: Date,
-        strain: Double,
-        recovery: Double? = nil,
-        recoveryComponents: RecoveryComponents? = nil,
-        workouts: [WorkoutSummary] = [],
-        sleepDuration: Double? = nil,
-        sleepStart: Date? = nil,
-        sleepEnd: Date? = nil,
-        hrvAverage: Double? = nil,
-        restingHeartRate: Double? = nil,
-        baselineMetrics: BaselineMetrics? = nil,
-        lastUpdated: Date = Date()
-    ) {
-        self.id = id
-        self.date = date.startOfDay
-        self.strain = strain
-        self.recovery = recovery
-        self.recoveryComponents = recoveryComponents
-        self.workouts = workouts
-        self.sleepDuration = sleepDuration
-        self.sleepStart = sleepStart
-        self.sleepEnd = sleepEnd
-        self.hrvAverage = hrvAverage
-        self.restingHeartRate = restingHeartRate
-        self.baselineMetrics = baselineMetrics
-        self.lastUpdated = lastUpdated
-    }
-    
-    // MARK: - Helper Methods
-    
-    /// Get workouts by type
-    func workouts(ofType type: HKWorkoutActivityType) -> [WorkoutSummary] {
-        return workouts.filter { $0.workoutType == type }
-    }
-    
-    /// Get swimming workouts
-    var swimmingWorkouts: [WorkoutSummary] {
-        return workouts(ofType: .swimming)
-    }
-    
-    /// Get workout breakdown by type
-    func workoutBreakdown() -> [(type: String, count: Int, totalStrain: Double)] {
-        let grouped = Dictionary(grouping: workouts) { $0.workoutType }
-        return grouped.map { type, workouts in
-            let totalStrain = workouts.reduce(0) { $0 + $1.strain }
-            return (type.name, workouts.count, totalStrain)
-        }.sorted { $0.totalStrain > $1.totalStrain }
-    }
-    
-    /// Create a copy with updated recovery
-    func withUpdatedRecovery(_ recovery: Double, components: RecoveryComponents) -> DailyMetrics {
-        return DailyMetrics(
-            id: self.id,
-            date: self.date,
-            strain: self.strain,
-            recovery: recovery,
-            recoveryComponents: components,
-            workouts: self.workouts,
-            sleepDuration: self.sleepDuration,
-            sleepStart: self.sleepStart,
-            sleepEnd: self.sleepEnd,
-            hrvAverage: self.hrvAverage,
-            restingHeartRate: self.restingHeartRate,
-            baselineMetrics: self.baselineMetrics,
-            lastUpdated: Date()
-        )
-    }
-    
-    /// Create a copy with updated baseline
-    func withUpdatedBaseline(_ baseline: BaselineMetrics) -> DailyMetrics {
-        return DailyMetrics(
-            id: self.id,
-            date: self.date,
-            strain: self.strain,
-            recovery: self.recovery,
-            recoveryComponents: self.recoveryComponents,
-            workouts: self.workouts,
-            sleepDuration: self.sleepDuration,
-            sleepStart: self.sleepStart,
-            sleepEnd: self.sleepEnd,
-            hrvAverage: self.hrvAverage,
-            restingHeartRate: self.restingHeartRate,
-            baselineMetrics: baseline,
-            lastUpdated: Date()
-        )
+    var formattedTimeRange: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        let start = formatter.string(from: startTime)
+        let end = formatter.string(from: endTime)
+        
+        let calendar = Calendar.current
+        let startDay = calendar.component(.day, from: startTime)
+        let endDay = calendar.component(.day, from: endTime)
+        
+        if startDay != endDay {
+            formatter.dateFormat = "EEE"
+            let dayPrefix = "[\(formatter.string(from: startTime))] "
+            return "\(dayPrefix)\(start) - \(end)"
+        } else {
+            return "\(start) - \(end)"
+        }
     }
 }
 
-// MARK: - Codable Conformance
-extension DailyMetrics: Codable {}
+// MARK: - Stress Data
+struct StressDataPoint: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let value: Double // 0-3
+    let activity: Activity?
+    
+    var stressLevel: StressLevel {
+        switch value {
+        case 0..<1.0: return .low
+        case 1.0..<2.0: return .medium
+        case 2.0...3.0: return .high
+        default: return .medium
+        }
+    }
+    
+    enum StressLevel: String {
+        case low = "LOW"
+        case medium = "MEDIUM"
+        case high = "HIGH"
+        
+        var color: String {
+            switch self {
+            case .low: return "RecoveryGreen"
+            case .medium: return "StressMedium"
+            case .high: return "StressHigh"
+            }
+        }
+    }
+}
 
-// MARK: - Identifiable Conformance
-extension DailyMetrics: Identifiable {}
+// MARK: - Strain & Recovery Weekly Data
+struct StrainRecoveryWeekData: Identifiable {
+    let id = UUID()
+    let weekDays: [DayData]
+    
+    struct DayData: Identifiable {
+        let id = UUID()
+        let date: Date
+        let strain: Double
+        let recovery: Double
+        
+        var dayLabel: String {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEE d"
+            return formatter.string(from: date)
+        }
+        
+        var recoveryZone: RecoveryZone {
+            switch recovery {
+            case 67...100: return .green
+            case 34..<67: return .yellow
+            case 0..<34: return .red
+            default: return .yellow
+            }
+        }
+        
+        enum RecoveryZone {
+            case green, yellow, red
+            
+            var color: String {
+                switch self {
+                case .green: return "RecoveryGreen"
+                case .yellow: return "RecoveryYellow"
+                case .red: return "RecoveryRed"
+                }
+            }
+        }
+    }
+}
 
-// MARK: - Equatable Conformance
-extension DailyMetrics: Equatable {}
+// MARK: - Health Metric
+struct HealthMetric: Identifiable {
+    let id = UUID()
+    let name: String
+    let value: String
+    let comparisonValue: String
+    let trend: Trend
+    let icon: String
+    
+    enum Trend {
+        case up(isPositive: Bool)
+        case down(isPositive: Bool)
+        case stable
+        
+        var arrow: String {
+            switch self {
+            case .up: return "arrow.up"
+            case .down: return "arrow.down"
+            case .stable: return "circle.fill"
+            }
+        }
+        
+        var color: String {
+            switch self {
+            case .up(let isPositive), .down(let isPositive):
+                return isPositive ? "RecoveryGreen" : "TrendNegative"
+            case .stable:
+                return "TrendNeutral"
+            }
+        }
+    }
+}
 
-// MARK: - Comparable Conformance (for sorting by date)
-extension DailyMetrics: Comparable {
-    static func < (lhs: DailyMetrics, rhs: DailyMetrics) -> Bool {
-        return lhs.date < rhs.date
+// MARK: - Sample Data
+extension DailyMetrics {
+    static var sampleData: DailyMetrics {
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Create sample sleep activity
+        let sleepStart = calendar.date(byAdding: .hour, value: -11, to: now)!
+        let sleepEnd = calendar.date(byAdding: .hour, value: -2, to: now)!
+        let sleepActivity = Activity(
+            type: .sleep,
+            startTime: sleepStart,
+            endTime: sleepEnd,
+            strain: nil,
+            duration: sleepEnd.timeIntervalSince(sleepStart)
+        )
+        
+        // Create sample swimming activity
+        let swimStart = calendar.date(byAdding: .hour, value: -1, to: now)!
+        let swimEnd = now
+        let swimActivity = Activity(
+            type: .swimming,
+            startTime: swimStart,
+            endTime: swimEnd,
+            strain: 10.1,
+            duration: swimEnd.timeIntervalSince(swimStart)
+        )
+        
+        // Create stress history
+        var stressHistory: [StressDataPoint] = []
+        for i in stride(from: -720, to: 0, by: 30) {
+            let timestamp = calendar.date(byAdding: .minute, value: i, to: now)!
+            let hour = calendar.component(.hour, from: timestamp)
+            
+            // Lower stress during sleep (midnight to 8am)
+            let baseStress: Double
+            if hour >= 0 && hour < 8 {
+                baseStress = Double.random(in: 0.2...0.8)
+            } else if hour >= 9 && hour < 11 {
+                // Higher during swimming
+                baseStress = Double.random(in: 1.8...2.5)
+            } else {
+                baseStress = Double.random(in: 0.8...1.5)
+            }
+            
+            stressHistory.append(StressDataPoint(
+                timestamp: timestamp,
+                value: baseStress,
+                activity: (hour >= 9 && hour < 11) ? swimActivity : nil
+            ))
+        }
+        
+        return DailyMetrics(
+            date: now,
+            sleepScore: 77,
+            recoveryScore: 82,
+            strainScore: 10.2,
+            sleepDuration: 8 * 3600 + 33 * 60, // 8:33
+            restorativeSleepPercentage: 32,
+            sleepEfficiency: 76,
+            sleepConsistency: 81,
+            timeInBed: 11 * 3600 + 18 * 60, // 11:18
+            sleepDebt: 16 * 60, // 0:16
+            respiratoryRate: 14.0,
+            calories: 1625,
+            steps: 2140,
+            averageHeartRate: 59,
+            restingHeartRate: 49,
+            vo2Max: 60,
+            currentStress: 1.4,
+            stressHistory: stressHistory,
+            activities: [sleepActivity, swimActivity],
+            healthMetricsInRange: 5,
+            totalHealthMetrics: 5
+        )
     }
 }
