@@ -3,6 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
+//  Enhanced with detailed error logging
 //
 
 import Foundation
@@ -16,8 +17,10 @@ class DashboardViewModel: ObservableObject {
     @Published var todayMetrics: DailyMetrics?
     @Published var recentMetrics: [DailyMetrics] = []
     @Published var isLoading = false
+    @Published var isSyncing = false
     @Published var errorMessage: String?
     @Published var healthKitAuthorized = false
+    @Published var lastSyncDate: Date?
     
     // MARK: - Computed Properties
     var todayStrain: Double {
@@ -72,52 +75,105 @@ class DashboardViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
+        print("🚀 ========== INITIALIZATION STARTED ==========")
+        
         do {
-            // Request HealthKit authorization
+            // Step 1: HealthKit Authorization
+            print("📱 Step 1: Requesting HealthKit authorization...")
             try await healthKitManager.requestAuthorization()
             healthKitAuthorized = true
+            print("✅ HealthKit authorized successfully")
             
-            // Load existing data from repository
+            // Step 2: Load existing data
+            print("💾 Step 2: Loading stored data from CoreData...")
             loadStoredData()
+            print("✅ Stored data loaded")
+            print("   - Today's metrics: \(todayMetrics != nil ? "Found" : "None")")
+            print("   - Recent metrics count: \(recentMetrics.count)")
             
-            // Sync with HealthKit
+            // Step 3: Sync with HealthKit
+            print("🔄 Step 3: Starting HealthKit sync...")
             await syncWithHealthKit()
+            lastSyncDate = Date()
+            print("✅ HealthKit sync completed")
+            
+            print("🎉 ========== INITIALIZATION COMPLETE ==========")
             
         } catch {
+            print("❌❌❌ ========== INITIALIZATION FAILED ========== ❌❌❌")
+            print("Error type: \(type(of: error))")
+            print("Error description: \(error)")
+            print("Localized description: \(error.localizedDescription)")
+            
+            if let nsError = error as NSError? {
+                print("NSError details:")
+                print("  - Domain: \(nsError.domain)")
+                print("  - Code: \(nsError.code)")
+                print("  - UserInfo: \(nsError.userInfo)")
+            }
+            
+            if let hkError = error as? HealthKitError {
+                print("HealthKit Error: \(hkError.errorDescription ?? "Unknown")")
+            }
+            
             errorMessage = "Failed to initialize: \(error.localizedDescription)"
             healthKitAuthorized = false
+            print("❌❌❌ ========================================== ❌❌❌")
         }
         
         isLoading = false
+        print("🏁 Initialize method completed (isLoading: false)")
     }
     
     /// Refresh all data
     func refresh() async {
+        print("🔄 ========== REFRESH STARTED ==========")
         isLoading = true
         errorMessage = nil
         
         await syncWithHealthKit()
+        lastSyncDate = Date()
         
         isLoading = false
+        print("🏁 ========== REFRESH COMPLETE ==========")
     }
     
     /// Sync today's data with HealthKit
     func syncToday() async {
+        guard !isSyncing else { return }
+        
+        isSyncing = true
+        print("🔄 Syncing today's data...")
         let today = Date().startOfDay
         await syncDay(today)
+        loadStoredData()
+        lastSyncDate = Date()
+        isSyncing = false
+        print("✅ Today's sync complete")
     }
     
     // MARK: - Private Methods
     
     private func loadStoredData() {
         do {
-            // Load today's metrics
+            print("   📖 Loading today's metrics...")
             todayMetrics = try repository.fetchDailyMetrics(for: Date())
+            if let metrics = todayMetrics {
+                print("   ✓ Today's metrics found: Strain=\(metrics.strain), Recovery=\(metrics.recovery ?? -1)")
+            } else {
+                print("   ℹ️ No metrics found for today")
+            }
             
-            // Load recent metrics
+            print("   📖 Loading recent metrics (last \(daysToFetch) days)...")
             recentMetrics = try repository.fetchRecentDailyMetrics(days: daysToFetch)
+            print("   ✓ Loaded \(recentMetrics.count) days of metrics")
+            
         } catch {
-            print("Error loading stored data: \(error)")
+            print("   ❌ Error loading stored data: \(error)")
+            print("   Error type: \(type(of: error))")
+            if let nsError = error as NSError? {
+                print("   NSError - Domain: \(nsError.domain), Code: \(nsError.code)")
+            }
         }
     }
     
@@ -125,48 +181,66 @@ class DashboardViewModel: ObservableObject {
         let endDate = Date().startOfDay
         let startDate = Calendar.current.date(byAdding: .day, value: -daysToFetch, to: endDate)!
         
+        print("   🔄 Syncing \(daysToFetch) days from \(startDate.formatted()) to \(endDate.formatted())")
+        
         // Sync each day
         var currentDate = startDate
+        var dayCount = 0
         while currentDate <= endDate {
+            dayCount += 1
+            print("   📅 Processing day \(dayCount)/\(daysToFetch + 1): \(currentDate.formatted(.dateTime.month().day()))")
             await syncDay(currentDate)
             currentDate = Calendar.current.date(byAdding: .day, value: 1, to: currentDate)!
         }
         
-        // Reload data after sync
+        print("   🔄 Reloading data after sync...")
         loadStoredData()
+        print("   ✅ Sync complete - Final data loaded")
     }
     
     private func syncDay(_ date: Date) async {
+        let dayStart = date.startOfDay
+        let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)!
+        
+        print("      🔍 Syncing: \(dayStart.formatted(.dateTime.month().day().year()))")
+        
         do {
-            let dayStart = date.startOfDay
-            let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)!
-            
-            // Fetch workouts from HealthKit
+            // Fetch workouts
+            print("      ├─ Fetching workouts...")
             let hkWorkouts = try await healthKitManager.fetchWorkouts(from: dayStart, to: dayEnd)
+            print("      ├─ Found \(hkWorkouts.count) workout(s)")
             
             guard !hkWorkouts.isEmpty else {
-                // No workouts for this day
+                print("      └─ ⊘ No workouts, skipping")
                 return
             }
             
             // Get heart rate profile
+            print("      ├─ Fetching resting heart rate...")
             let restingHR = try await healthKitManager.fetchRestingHeartRate() ?? 60.0
-            let maxHR = 220.0 - 30.0 // Estimate, adjust based on user age
+            print("      ├─ Resting HR: \(restingHR) bpm")
+            
+            let maxHR = 220.0 - 30.0 // TODO: Get from user profile
             let hrProfile = HeartRateProfile(
                 maxHeartRate: maxHR,
                 restingHeartRate: restingHR,
-                age: 30 // You'll need to get this from user profile
+                age: 30
             )
             
-            // Calculate total daily strain
+            // Calculate daily strain
+            print("      ├─ Calculating strain...")
             let totalStrain = await StrainCalculator.calculateDailyStrain(
                 workouts: hkWorkouts,
                 hrProfile: hrProfile
             )
+            print("      ├─ Total strain: \(String(format: "%.1f", totalStrain))")
             
             // Create workout summaries
+            print("      ├─ Creating workout summaries...")
             var workoutSummaries: [WorkoutSummary] = []
-            for hkWorkout in hkWorkouts {
+            for (index, hkWorkout) in hkWorkouts.enumerated() {
+                print("      │  ├─ Workout \(index + 1): \(hkWorkout.workoutActivityType.name)")
+                
                 let workoutStrain = await StrainCalculator.calculateWorkoutStrain(
                     workout: hkWorkout,
                     hrProfile: hrProfile
@@ -178,7 +252,7 @@ class DashboardViewModel: ObservableObject {
                 
                 let intensity = avgHR.map { StrainCalculator.calculateHRIntensity(avgHR: $0, profile: hrProfile) }
                 
-                // Get calories using the new API
+                // Get calories
                 let calories: Double
                 if let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
                    let energyStats = hkWorkout.statistics(for: energyType),
@@ -188,17 +262,19 @@ class DashboardViewModel: ObservableObject {
                     calories = 0
                 }
                 
+                print("      │  └─ Strain: \(String(format: "%.1f", workoutStrain)), Calories: \(Int(calories))")
+                
                 let summary = WorkoutSummary(
                     id: UUID(),
                     workoutType: hkWorkout.workoutActivityType,
                     startDate: hkWorkout.startDate,
                     endDate: hkWorkout.endDate,
-                    duration: hkWorkout.duration / 60.0, // Convert to minutes
+                    duration: hkWorkout.duration / 60.0,
                     distance: hkWorkout.totalDistance?.doubleValue(for: .meter()),
                     calories: calories,
                     averageHeartRate: avgHR,
                     maxHeartRate: maxHRValue,
-                    swimmingStrokeStyle: nil, // Add swimming logic if needed
+                    swimmingStrokeStyle: nil,
                     lapCount: nil,
                     strain: workoutStrain,
                     heartRateIntensity: intensity
@@ -206,31 +282,35 @@ class DashboardViewModel: ObservableObject {
                 
                 workoutSummaries.append(summary)
             }
+            print("      ├─ Created \(workoutSummaries.count) workout summary(ies)")
             
             // Fetch sleep data
+            print("      ├─ Fetching sleep data...")
             let sleepDuration = try await healthKitManager.fetchSleepDuration(from: dayStart, to: dayEnd)
+            print("      ├─ Sleep: \(String(format: "%.1f", sleepDuration))h")
             
-            // Fetch HRV and resting heart rate
+            // Fetch HRV
+            print("      ├─ Fetching HRV...")
             let hrvReadings = try await healthKitManager.fetchHRVReadings(from: dayStart, to: dayEnd)
             let hrvAverage = hrvReadings.isEmpty ? nil : hrvReadings.reduce(0.0, +) / Double(hrvReadings.count)
+            print("      ├─ HRV: \(hrvAverage.map { String(format: "%.1f", $0) } ?? "N/A") ms")
             
             // Calculate recovery
+            print("      ├─ Calculating recovery...")
             var recovery: Double?
             var recoveryComponents: RecoveryComponents?
             
-            // Get baseline metrics
             let historicalMetrics = try repository.fetchRecentDailyMetrics(days: 28)
+            print("      ├─ Historical data: \(historicalMetrics.count) days")
+            
             if let baseline = BaselineCalculator.calculateBaselines(from: historicalMetrics, forDate: date) {
-                
-                let recoveryScore = RecoveryCalculator.calculateRecoveryScore(
+                recovery = RecoveryCalculator.calculateRecoveryScore(
                     hrvCurrent: hrvAverage,
                     hrvBaseline: baseline.hrvBaseline,
                     rhrCurrent: restingHR,
                     rhrBaseline: baseline.rhrBaseline,
                     sleepDuration: sleepDuration
                 )
-                
-                recovery = recoveryScore
                 
                 recoveryComponents = RecoveryCalculator.recoveryComponents(
                     hrvCurrent: hrvAverage,
@@ -240,9 +320,13 @@ class DashboardViewModel: ObservableObject {
                     sleepDuration: sleepDuration,
                     respiratoryRate: nil
                 )
+                print("      ├─ Recovery: \(recovery.map { String(format: "%.0f", $0) } ?? "N/A")%")
+            } else {
+                print("      ├─ Recovery: N/A (insufficient baseline data)")
             }
             
             // Create daily metrics
+            print("      ├─ Creating daily metrics object...")
             let dailyMetrics = DailyMetrics(
                 date: dayStart,
                 strain: totalStrain,
@@ -257,10 +341,19 @@ class DashboardViewModel: ObservableObject {
             )
             
             // Save to repository
+            print("      ├─ Saving to CoreData...")
             try repository.saveDailyMetrics(dailyMetrics)
+            print("      └─ ✅ Day saved successfully")
             
         } catch {
-            print("Error syncing day \(date): \(error)")
+            print("      └─ ❌ Error syncing day: \(error)")
+            print("         Error type: \(type(of: error))")
+            print("         Description: \(error.localizedDescription)")
+            
+            if let nsError = error as NSError? {
+                print("         NSError - Domain: \(nsError.domain), Code: \(nsError.code)")
+                print("         UserInfo: \(nsError.userInfo)")
+            }
         }
     }
 }

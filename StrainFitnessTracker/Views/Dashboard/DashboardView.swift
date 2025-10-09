@@ -3,7 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/8/25.
-//  Updated: Dark/Light mode support
+//  Updated: Dark/Light mode support & DataSyncService integration
 //
 
 import SwiftUI
@@ -460,13 +460,31 @@ struct DashboardView: View {
                     await viewModel.syncToday()
                 }
             } label: {
-                Text("Sync Now")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 12)
-                    .background(Color.blue)
-                    .clipShape(Capsule())
+                HStack(spacing: 8) {
+                    if viewModel.isSyncing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.8)
+                        Text("Syncing...")
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Sync Now")
+                    }
+                }
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal, 32)
+                .padding(.vertical, 12)
+                .background(viewModel.isSyncing ? Color.blue.opacity(0.6) : Color.blue)
+                .clipShape(Capsule())
+            }
+            .disabled(viewModel.isSyncing)
+            
+            // Show last sync time if available
+            if let lastSync = viewModel.lastSyncDate {
+                Text("Last synced: \(lastSync.formatted(.relative(presentation: .named)))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .padding()
