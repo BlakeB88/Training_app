@@ -1,6 +1,12 @@
+//
+//  WorkoutListView.swift
+//  StrainFitnessTracker
+//
+//  Updated: 10/9/25 - Fixed TimeInterval extension usage
+//
+
 import SwiftUI
 import HealthKit
-import UIKit
 
 struct WorkoutListView: View {
     let workouts: [WorkoutSummary]

@@ -6,12 +6,12 @@
 //
 
 import SwiftUI
-
 @main
 struct StrainFitnessTrackerApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainTabView()
+                .preferredColorScheme(.dark)
         }
     }
 }

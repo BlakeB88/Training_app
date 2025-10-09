@@ -1,13 +1,15 @@
 //
-//  DashboardViewModel.swift
+//  DashboardViewModel.swift (CONNECTED VERSION)
 //  StrainFitnessTracker
 //
-//  ViewModel for dashboard - connects UI to calculators
+//  Connects to real HealthKit data via DataSyncService
 //
 
 import Foundation
 import Combine
+import HealthKit
 
+@MainActor
 class DashboardViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var metrics: DailyMetrics
@@ -16,27 +18,29 @@ class DashboardViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     
-    // MARK: - Calculator Dependencies
-    // These will be injected or initialized with your existing calculators
-    // private let baselineCalculator: BaselineCalculator
-    // private let recoveryCalculator: RecoveryCalculator
-    // private let strainCalculator: StrainCalculator
-    // private let stressCalculator: StressCalculator
-    // private let healthKitManager: HealthKitManager
+    // MARK: - Dependencies
+    private let dataSyncService: DataSyncService
+    private let repository: MetricsRepository
+    private let stressMonitorVM: StressMonitorViewModel
     
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
-    init() {
-        // For now, using sample data
-        // In production, inject your calculators here
+    init(
+        dataSyncService: DataSyncService = .shared,
+        repository: MetricsRepository = MetricsRepository(),
+        stressMonitorVM: StressMonitorViewModel
+    ) {
+        self.dataSyncService = dataSyncService
+        self.repository = repository
+        self.stressMonitorVM = stressMonitorVM
+        
+        // Start with sample data (will be replaced on first load)
         self.metrics = DailyMetrics.sampleData
         self.weekData = StrainRecoveryWeekData.sampleData
-        
-        // Generate detailed metrics
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
         
-        // Setup observers and data refresh
+        // Setup observers
         setupObservers()
     }
     
@@ -50,96 +54,278 @@ class DashboardViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Refresh all dashboard data
-    func refreshData() {
+    /// Refresh all dashboard data (triggers HealthKit sync)
+    func refreshData() async {
         isLoading = true
         errorMessage = nil
         
-        // In production, this would fetch from your calculators:
-        // Task {
-        //     do {
-        //         async let sleepData = healthKitManager.fetchSleepData()
-        //         async let hrvData = healthKitManager.fetchHRVData()
-        //         async let activityData = healthKitManager.fetchActivityData()
-        //
-        //         let (sleep, hrv, activity) = try await (sleepData, hrvData, activityData)
-        //
-        //         // Calculate metrics
-        //         let recovery = await recoveryCalculator.calculate(hrv: hrv, sleep: sleep)
-        //         let strain = await strainCalculator.calculate(activities: activity)
-        //         let stress = await stressCalculator.getCurrentStress()
-        //
-        //         // Update UI on main thread
-        //         await MainActor.run {
-        //             self.updateMetrics(recovery: recovery, strain: strain, stress: stress)
-        //             self.isLoading = false
-        //         }
-        //     } catch {
-        //         await MainActor.run {
-        //             self.errorMessage = error.localizedDescription
-        //             self.isLoading = false
-        //         }
-        //     }
-        // }
-        
-        // For demo, just reload sample data
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            self.metrics = DailyMetrics.sampleData
-            self.detailedMetrics = Self.generateDetailedMetrics(from: self.metrics)
-            self.isLoading = false
+        do {
+            // 1. Sync with HealthKit
+            await dataSyncService.quickSync()
+            
+            // 2. Check for errors
+            if let syncError = dataSyncService.syncError {
+                throw syncError
+            }
+            
+            // 3. Load synced data from repository
+            await loadFromRepository()
+            
+        } catch {
+            errorMessage = error.localizedDescription
+            print("❌ Dashboard refresh error: \(error)")
         }
+        
+        isLoading = false
     }
     
     /// Load data for a specific date
-    func loadData(for date: Date) {
-        // In production, fetch historical data for the selected date
-        // For now, just refresh current data
-        refreshData()
+    func loadData(for date: Date) async {
+        isLoading = true
+        errorMessage = nil
+        
+        do {
+            // Sync that specific date
+            await dataSyncService.syncDate(date)
+            
+            // Load from repository
+            await loadFromRepository(for: date)
+            
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        
+        isLoading = false
     }
     
     /// Sync with HealthKit
-    func syncHealthKit() {
+    func syncHealthKit() async {
         isLoading = true
         
-        // In production:
-        // Task {
-        //     do {
-        //         try await healthKitManager.requestAuthorization()
-        //         await refreshData()
-        //     } catch {
-        //         await MainActor.run {
-        //             self.errorMessage = "Failed to sync with HealthKit"
-        //             self.isLoading = false
-        //         }
-        //     }
-        // }
-        
-        // For demo
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            self.refreshData()
+        // Request authorization if needed
+        if !HealthKitManager.shared.isAuthorized {
+            do {
+                try await HealthKitManager.shared.requestAuthorization()
+            } catch {
+                errorMessage = "Failed to authorize HealthKit"
+                isLoading = false
+                return
+            }
         }
+        
+        // Do full sync (last 7 days)
+        await dataSyncService.fullSync(days: 7)
+        
+        // Load fresh data
+        await loadFromRepository()
+        
+        isLoading = false
     }
     
     // MARK: - Private Methods
     
-    private func setupObservers() {
-        // Setup any observers for calculator updates
-        // Example:
-        // NotificationCenter.default.publisher(for: .healthKitDataUpdated)
-        //     .sink { [weak self] _ in
-        //         self?.refreshData()
-        //     }
-        //     .store(in: &cancellables)
+    private func loadFromRepository(for date: Date = Date()) async {
+        do {
+            // Load today's metrics
+            guard let simpleDailyMetrics = try repository.fetchDailyMetrics(for: date) else {
+                // No data yet, keep sample data
+                print("⚠️ No data in repository for \(date.formatted())")
+                return
+            }
+            
+            // Load week data
+            let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: date)!
+            let weekMetrics = try repository.fetchDailyMetrics(from: weekStart, to: date)
+            
+            // Convert to UI models
+            let uiMetrics = convertToUIMetrics(simpleDailyMetrics)
+            let uiWeekData = convertToWeekData(weekMetrics)
+            
+            // Update UI
+            self.metrics = uiMetrics
+            self.weekData = uiWeekData
+            self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
+            
+            print("✅ Dashboard loaded with real data")
+            
+        } catch {
+            print("❌ Failed to load from repository: \(error)")
+            errorMessage = "Failed to load data"
+        }
     }
     
-    private func updateMetrics(recovery: Double, strain: Double, stress: Double) {
-        // Update metrics with new calculated values
-        metrics.recoveryScore = recovery
-        metrics.strainScore = strain
-        metrics.currentStress = stress
+    private func setupObservers() {
+        // Observe sync completion
+        dataSyncService.$lastSyncDate
+            .dropFirst()
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    await self?.loadFromRepository()
+                }
+            }
+            .store(in: &cancellables)
         
-        // Regenerate detailed metrics
-        detailedMetrics = Self.generateDetailedMetrics(from: metrics)
+        // Observe stress updates
+        stressMonitorVM.$currentStress
+            .compactMap { $0 }
+            .sink { [weak self] stress in
+                self?.updateStress(stress)
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func updateStress(_ stress: StressMetrics) {
+        // Update current stress
+        metrics.currentStress = stress.stressLevel
+        
+        // Add to history
+        let stressPoint = StressDataPoint(
+            timestamp: stress.timestamp,
+            value: stress.stressLevel,
+            activity: nil // Could map from current workout
+        )
+        metrics.stressHistory.append(stressPoint)
+        
+        // Keep last 24 hours
+        let oneDayAgo = Date().addingTimeInterval(-24 * 60 * 60)
+        metrics.stressHistory = metrics.stressHistory.filter { $0.timestamp >= oneDayAgo }
+    }
+    
+    // MARK: - Conversion Methods
+    
+    private func convertToUIMetrics(_ simple: SimpleDailyMetrics) -> DailyMetrics {
+        // Calculate sleep score (0-100 based on duration and quality)
+        let sleepScore = calculateSleepScore(simple)
+        
+        // Convert workouts to activities
+        let activities = convertWorkoutsToActivities(simple.workouts)
+        
+        // Add sleep activity if available
+        var allActivities = activities
+        if let sleepDuration = simple.sleepDuration, sleepDuration > 0 {
+            let sleepActivity = Activity(
+                type: .sleep,
+                startTime: simple.sleepStart ?? simple.date,
+                endTime: simple.sleepEnd ?? simple.date.addingTimeInterval(sleepDuration * 3600),
+                strain: nil,
+                duration: sleepDuration * 3600
+            )
+            allActivities.insert(sleepActivity, at: 0)
+        }
+        
+        return DailyMetrics(
+            date: simple.date,
+            sleepScore: sleepScore,
+            recoveryScore: simple.recovery ?? 0,
+            strainScore: simple.strain,
+            sleepDuration: (simple.sleepDuration ?? 0) * 3600,
+            restorativeSleepPercentage: 0, // Not tracked in SimpleDailyMetrics
+            sleepEfficiency: 0,
+            sleepConsistency: 0,
+            timeInBed: 0,
+            sleepDebt: 0,
+            respiratoryRate: simple.baselineMetrics?.respiratoryRateBaseline ?? 14.0,
+            calories: Int(simple.workouts.reduce(0.0) { $0 + $1.calories }),
+            steps: 0, // Not tracked
+            averageHeartRate: Int(simple.restingHeartRate ?? 60),
+            restingHeartRate: Int(simple.restingHeartRate ?? 60),
+            vo2Max: 0, // Not tracked
+            currentStress: stressMonitorVM.currentStressLevel,
+            stressHistory: convertStressHistory(),
+            activities: allActivities,
+            healthMetricsInRange: calculateMetricsInRange(simple),
+            totalHealthMetrics: 5
+        )
+    }
+    
+    private func calculateSleepScore(_ metrics: SimpleDailyMetrics) -> Double {
+        guard let duration = metrics.sleepDuration else { return 0 }
+        
+        // Simple scoring: optimal is 8 hours
+        let optimal = 8.0
+        let score = min(100.0, (duration / optimal) * 100.0)
+        return score
+    }
+    
+    private func convertWorkoutsToActivities(_ workouts: [WorkoutSummary]) -> [Activity] {
+        return workouts.map { workout in
+            Activity(
+                type: mapWorkoutType(workout.workoutType),
+                startTime: workout.startDate,
+                endTime: workout.endDate,
+                strain: workout.strain,
+                duration: workout.duration
+            )
+        }
+    }
+    
+    private func mapWorkoutType(_ hkType: HKWorkoutActivityType) -> Activity.ActivityType {
+        switch hkType {
+        case .swimming: return .swimming
+        case .running: return .running
+        case .cycling: return .cycling
+        case .walking: return .walking
+        default: return .workout
+        }
+    }
+    
+    private func convertStressHistory() -> [StressDataPoint] {
+        return stressMonitorVM.todayStressData.map { stress in
+            StressDataPoint(
+                timestamp: stress.timestamp,
+                value: stress.stressLevel,
+                activity: nil
+            )
+        }
+    }
+    
+    private func calculateMetricsInRange(_ metrics: SimpleDailyMetrics) -> Int {
+        var inRange = 0
+        
+        // Check HRV
+        if let hrv = metrics.hrvAverage,
+           let baseline = metrics.baselineMetrics?.hrvBaseline {
+            if abs(hrv - baseline) / baseline < 0.15 { // Within 15%
+                inRange += 1
+            }
+        }
+        
+        // Check RHR
+        if let rhr = metrics.restingHeartRate,
+           let baseline = metrics.baselineMetrics?.rhrBaseline {
+            if abs(rhr - baseline) < 5 { // Within 5 bpm
+                inRange += 1
+            }
+        }
+        
+        // Check Sleep
+        if let sleep = metrics.sleepDuration, sleep >= 7 {
+            inRange += 1
+        }
+        
+        // Check Recovery
+        if let recovery = metrics.recovery, recovery >= 70 {
+            inRange += 1
+        }
+        
+        // Check Strain (not overtraining)
+        if metrics.strain < 18 {
+            inRange += 1
+        }
+        
+        return inRange
+    }
+    
+    private func convertToWeekData(_ weekMetrics: [SimpleDailyMetrics]) -> StrainRecoveryWeekData {
+        let dayData = weekMetrics.map { metrics in
+            StrainRecoveryWeekData.DayData(
+                date: metrics.date,
+                strain: metrics.strain,
+                recovery: metrics.recovery ?? 0
+            )
+        }
+        
+        return StrainRecoveryWeekData(weekDays: dayData)
     }
     
     private static func generateDetailedMetrics(from metrics: DailyMetrics) -> [HealthMetric] {
@@ -159,177 +345,3 @@ class DashboardViewModel: ObservableObject {
         ]
     }
 }
-
-// MARK: - Integration Guide
-/*
- 
- INTEGRATION WITH EXISTING CALCULATORS
- ======================================
- 
- To connect this ViewModel to your existing calculators, follow these steps:
- 
- 1. DEPENDENCY INJECTION
-    Add your calculators as dependencies:
- 
-    class DashboardViewModel: ObservableObject {
-        private let baselineCalculator: BaselineCalculator
-        private let recoveryCalculator: RecoveryCalculator
-        private let strainCalculator: StrainCalculator
-        private let stressCalculator: StressCalculator
-        private let healthKitManager: HealthKitManager
-        
-        init(
-            baselineCalculator: BaselineCalculator,
-            recoveryCalculator: RecoveryCalculator,
-            strainCalculator: StrainCalculator,
-            stressCalculator: StressCalculator,
-            healthKitManager: HealthKitManager
-        ) {
-            self.baselineCalculator = baselineCalculator
-            self.recoveryCalculator = recoveryCalculator
-            self.strainCalculator = strainCalculator
-            self.stressCalculator = stressCalculator
-            self.healthKitManager = healthKitManager
-            
-            // Initialize with empty data
-            self.metrics = DailyMetrics(...)
-            self.weekData = StrainRecoveryWeekData(...)
-            
-            // Load initial data
-            Task {
-                await refreshData()
-            }
-        }
-    }
- 
- 2. IMPLEMENT REFRESH DATA
-    Update the refreshData() method to use your calculators:
- 
-    func refreshData() async {
-        isLoading = true
-        
-        do {
-            // Fetch from HealthKit
-            let sleepData = try await healthKitManager.querySleep(for: Date())
-            let hrvData = try await healthKitManager.queryHRV(for: Date())
-            let workouts = try await healthKitManager.queryWorkouts(for: Date())
-            
-            // Calculate metrics
-            let baseline = baselineCalculator.calculate(hrv: hrvData, sleep: sleepData)
-            let recovery = recoveryCalculator.calculateRecovery(
-                hrv: hrvData,
-                sleep: sleepData,
-                baseline: baseline
-            )
-            let strain = strainCalculator.calculateStrain(workouts: workouts)
-            let stress = stressCalculator.calculateStress(hrv: hrvData)
-            
-            // Update UI
-            await MainActor.run {
-                self.updateMetrics(
-                    sleepScore: sleepData.score,
-                    recovery: recovery,
-                    strain: strain,
-                    stress: stress
-                )
-                self.isLoading = false
-            }
-        } catch {
-            await MainActor.run {
-                self.errorMessage = error.localizedDescription
-                self.isLoading = false
-            }
-        }
-    }
- 
- 3. MAP CALCULATOR OUTPUT TO DAILYMETRICS
-    Create a method to convert your calculator outputs to DailyMetrics:
- 
-    private func createDailyMetrics(
-        from sleepData: SleepData,
-        recovery: RecoveryData,
-        strain: StrainData,
-        stress: StressData
-    ) -> DailyMetrics {
-        return DailyMetrics(
-            date: Date(),
-            sleepScore: sleepData.score,
-            recoveryScore: recovery.score,
-            strainScore: strain.score,
-            sleepDuration: sleepData.duration,
-            // ... map all other fields
-        )
-    }
- 
- 4. HANDLE REAL-TIME UPDATES
-    If your calculators provide real-time updates, set up observers:
- 
-    private func setupObservers() {
-        // Example: Observe HRV updates for real-time stress
-        stressCalculator.stressUpdates
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] newStress in
-                self?.metrics.currentStress = newStress.value
-                self?.metrics.stressHistory.append(newStress)
-            }
-            .store(in: &cancellables)
-    }
- 
- 5. IMPLEMENT ACTIVITY LOGGING
-    Add methods to log new activities:
- 
-    func logActivity(type: Activity.ActivityType, start: Date, end: Date) async {
-        do {
-            // Calculate strain for the activity
-            let activityStrain = try await strainCalculator.calculateActivityStrain(
-                type: type,
-                duration: end.timeIntervalSince(start)
-            )
-            
-            // Create and add activity
-            let activity = Activity(
-                type: type,
-                startTime: start,
-                endTime: end,
-                strain: activityStrain,
-                duration: end.timeIntervalSince(start)
-            )
-            
-            await MainActor.run {
-                self.metrics.activities.append(activity)
-                self.metrics.strainScore += activityStrain
-            }
-        } catch {
-            // Handle error
-        }
-    }
- 
- 6. EXAMPLE APP INITIALIZATION
-    In your main app file:
- 
-    @main
-    struct StrainFitnessTrackerApp: App {
-        // Initialize calculators
-        let healthKitManager = HealthKitManager()
-        let baselineCalculator = BaselineCalculator()
-        let recoveryCalculator = RecoveryCalculator()
-        let strainCalculator = StrainCalculator()
-        let stressCalculator = StressCalculator()
-        
-        var body: some Scene {
-            WindowGroup {
-                DashboardView()
-                    .environmentObject(
-                        DashboardViewModel(
-                            baselineCalculator: baselineCalculator,
-                            recoveryCalculator: recoveryCalculator,
-                            strainCalculator: strainCalculator,
-                            stressCalculator: stressCalculator,
-                            healthKitManager: healthKitManager
-                        )
-                    )
-            }
-        }
-    }
- 
- */

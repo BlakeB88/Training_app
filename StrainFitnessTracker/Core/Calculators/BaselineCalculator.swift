@@ -3,7 +3,7 @@ import Foundation
 struct BaselineCalculator {
     
     /// Calculate baseline metrics from historical data
-    static func calculateBaselines(from metrics: [DailyMetrics], forDate date: Date = Date()) -> BaselineMetrics? {
+    static func calculateBaselines(from metrics: [SimpleDailyMetrics], forDate date: Date = Date()) -> BaselineMetrics? {
         let calendar = Calendar.current
         
         let twentyEightDaysAgo = calendar.date(byAdding: .day, value: -28, to: date)!

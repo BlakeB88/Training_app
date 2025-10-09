@@ -3,6 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
+//  Updated: 10/9/25 - Updated to use SimpleDailyMetrics
 //
 
 import Foundation
@@ -23,7 +24,7 @@ class MetricsRepository {
     // MARK: - Daily Metrics Operations
     
     /// Save or update daily metrics
-    func saveDailyMetrics(_ metrics: DailyMetrics) throws {
+    func saveDailyMetrics(_ metrics: SimpleDailyMetrics) throws {
         let context = coreDataStack.viewContext
         
         // Check if entity already exists
@@ -43,7 +44,7 @@ class MetricsRepository {
         entity.strain = metrics.strain
         entity.recovery = metrics.recovery ?? 0
         entity.sleepDuration = metrics.sleepDuration ?? 0
-        entity.sleepStart = metrics.sleepStart
+        entity.sleepStart = metrics.sleepStart ?? metrics.date
         entity.sleepEnd = metrics.sleepEnd
         entity.hrvAverage = metrics.hrvAverage ?? 0
         entity.restingHeartRate = metrics.restingHeartRate ?? 0
@@ -83,7 +84,7 @@ class MetricsRepository {
     }
     
     /// Fetch daily metrics for a specific date
-    func fetchDailyMetrics(for date: Date) throws -> DailyMetrics? {
+    func fetchDailyMetrics(for date: Date) throws -> SimpleDailyMetrics? {
         let context = coreDataStack.viewContext
         let fetchRequest = NSFetchRequest<DailyMetricsEntity>(entityName: "DailyMetricsEntity")
         fetchRequest.predicate = NSPredicate(format: "date == %@", date.startOfDay as NSDate)
@@ -92,11 +93,11 @@ class MetricsRepository {
             return nil
         }
         
-        return convertToDailyMetrics(entity)
+        return convertToSimpleDailyMetrics(entity)
     }
     
     /// Fetch daily metrics for a date range
-    func fetchDailyMetrics(from startDate: Date, to endDate: Date) throws -> [DailyMetrics] {
+    func fetchDailyMetrics(from startDate: Date, to endDate: Date) throws -> [SimpleDailyMetrics] {
         let context = coreDataStack.viewContext
         let fetchRequest = NSFetchRequest<DailyMetricsEntity>(entityName: "DailyMetricsEntity")
         fetchRequest.predicate = NSPredicate(
@@ -107,21 +108,21 @@ class MetricsRepository {
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: true)]
         
         let entities = try context.fetch(fetchRequest)
-        return entities.compactMap { convertToDailyMetrics($0) }
+        return entities.compactMap { convertToSimpleDailyMetrics($0) }
     }
     
     /// Fetch all daily metrics
-    func fetchAllDailyMetrics() throws -> [DailyMetrics] {
+    func fetchAllDailyMetrics() throws -> [SimpleDailyMetrics] {
         let context = coreDataStack.viewContext
         let fetchRequest = NSFetchRequest<DailyMetricsEntity>(entityName: "DailyMetricsEntity")
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
         
         let entities = try context.fetch(fetchRequest)
-        return entities.compactMap { convertToDailyMetrics($0) }
+        return entities.compactMap { convertToSimpleDailyMetrics($0) }
     }
     
     /// Fetch recent daily metrics (last N days)
-    func fetchRecentDailyMetrics(days: Int) throws -> [DailyMetrics] {
+    func fetchRecentDailyMetrics(days: Int) throws -> [SimpleDailyMetrics] {
         let endDate = Date().startOfDay
         let startDate = Calendar.current.date(byAdding: .day, value: -days, to: endDate)!
         return try fetchDailyMetrics(from: startDate, to: endDate)
@@ -219,7 +220,7 @@ class MetricsRepository {
     // MARK: - Batch Operations
     
     /// Save multiple daily metrics
-    func saveDailyMetrics(_ metricsArray: [DailyMetrics]) throws {
+    func saveDailyMetrics(_ metricsArray: [SimpleDailyMetrics]) throws {
         for metrics in metricsArray {
             try saveDailyMetrics(metrics)
         }
@@ -231,7 +232,7 @@ class MetricsRepository {
             throw RepositoryError.metricsNotFound
         }
         
-        let updatedMetrics = DailyMetrics(
+        let updatedMetrics = SimpleDailyMetrics(
             id: metrics.id,
             date: metrics.date,
             strain: strain,
@@ -262,7 +263,7 @@ class MetricsRepository {
     
     // MARK: - Helper Methods
     
-    private func convertToDailyMetrics(_ entity: DailyMetricsEntity) -> DailyMetrics? {
+    private func convertToSimpleDailyMetrics(_ entity: DailyMetricsEntity) -> SimpleDailyMetrics? {
         guard let id = entity.id, let date = entity.date else {
             return nil
         }
@@ -272,7 +273,7 @@ class MetricsRepository {
         let workouts = workoutEntities.compactMap { convertToWorkoutSummary($0) }
             .sorted { $0.startDate < $1.startDate }
         
-        return DailyMetrics(
+        return SimpleDailyMetrics(
             id: id,
             date: date,
             strain: entity.strain,
@@ -343,7 +344,7 @@ enum RepositoryError: Error {
 extension MetricsRepository {
     
     /// Async version of saveDailyMetrics
-    func saveDailyMetricsAsync(_ metrics: DailyMetrics) async throws {
+    func saveDailyMetricsAsync(_ metrics: SimpleDailyMetrics) async throws {
         try await withCheckedThrowingContinuation { continuation in
             coreDataStack.performBackgroundTask { _ in
                 do {
@@ -357,7 +358,7 @@ extension MetricsRepository {
     }
     
     /// Async version of fetchDailyMetrics
-    func fetchDailyMetricsAsync(for date: Date) async throws -> DailyMetrics? {
+    func fetchDailyMetricsAsync(for date: Date) async throws -> SimpleDailyMetrics? {
         try await withCheckedThrowingContinuation { continuation in
             coreDataStack.performBackgroundTask { _ in
                 do {
