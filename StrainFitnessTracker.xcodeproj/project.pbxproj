@@ -40,22 +40,9 @@
 		DAE732FA2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyMetricsEntity+CoreDataProperties.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		DAE732F82E95E39C00BA3CA2 /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTracker" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				Core/Persistence/DataModel.xcdatamodeld,
-			);
-			target = DAE732172E8E1ADD00BA3CA2 /* StrainFitnessTracker */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		DAE7321A2E8E1ADD00BA3CA2 /* StrainFitnessTracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				DAE732F82E95E39C00BA3CA2 /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTracker" target */,
-			);
 			path = StrainFitnessTracker;
 			sourceTree = "<group>";
 		};

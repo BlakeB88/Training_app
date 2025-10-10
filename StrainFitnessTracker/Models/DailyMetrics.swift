@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 
 // MARK: - Core Metrics
 struct DailyMetrics: Identifiable {
@@ -73,11 +74,11 @@ struct Activity: Identifiable {
             }
         }
         
-        var color: String {
+        var color: Color {
             switch self {
-            case .sleep: return "SleepBlue"
-            case .swimming: return "AccentBlue"
-            case .running, .cycling, .workout, .walking: return "StrainBlue"
+            case .sleep: return .sleepBlue
+            case .swimming: return .accentBlue
+            case .running, .cycling, .workout, .walking: return .strainBlue
             }
         }
     }
@@ -129,11 +130,11 @@ struct StressDataPoint: Identifiable {
         case medium = "MEDIUM"
         case high = "HIGH"
         
-        var color: String {
+        var color: Color {
             switch self {
-            case .low: return "RecoveryGreen"
-            case .medium: return "StressMedium"
-            case .high: return "StressHigh"
+            case .low: return .stressLow
+            case .medium: return .stressMedium
+            case .high: return .stressHigh
             }
         }
     }
@@ -168,11 +169,11 @@ struct StrainRecoveryWeekData: Identifiable {
         enum RecoveryZone {
             case green, yellow, red
             
-            var color: String {
+            var color: Color {
                 switch self {
-                case .green: return "RecoveryGreen"
-                case .yellow: return "RecoveryYellow"
-                case .red: return "RecoveryRed"
+                case .green: return .recoveryZoneGreen
+                case .yellow: return .recoveryZoneYellow
+                case .red: return .recoveryZoneRed
                 }
             }
         }
@@ -201,12 +202,12 @@ struct HealthMetric: Identifiable {
             }
         }
         
-        var color: String {
+        var color: Color {
             switch self {
             case .up(let isPositive), .down(let isPositive):
-                return isPositive ? "RecoveryGreen" : "TrendNegative"
+                return isPositive ? .trendPositive : .trendNegative
             case .stable:
-                return "TrendNeutral"
+                return .trendNeutral
             }
         }
     }

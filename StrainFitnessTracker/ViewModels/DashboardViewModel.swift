@@ -17,6 +17,7 @@ class DashboardViewModel: ObservableObject {
     @Published var detailedMetrics: [HealthMetric] = []
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+    @Published var needsAuthorization: Bool = false
     
     // MARK: - Dependencies
     private let dataSyncService: DataSyncService
@@ -24,11 +25,12 @@ class DashboardViewModel: ObservableObject {
     private let stressMonitorVM: StressMonitorViewModel
     
     private var cancellables = Set<AnyCancellable>()
+    private var hasInitialized = false
     
     // MARK: - Initialization
     init(
-        dataSyncService: DataSyncService = .shared,
-        repository: MetricsRepository = MetricsRepository(),
+        dataSyncService: DataSyncService,
+        repository: MetricsRepository,
         stressMonitorVM: StressMonitorViewModel
     ) {
         self.dataSyncService = dataSyncService
@@ -40,8 +42,7 @@ class DashboardViewModel: ObservableObject {
         self.weekData = StrainRecoveryWeekData.sampleData
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
         
-        // Setup observers
-        setupObservers()
+        // Note: setupObservers will be called in initialize()
     }
     
     // MARK: - Computed Properties
@@ -54,46 +55,106 @@ class DashboardViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
-    /// Refresh all dashboard data (triggers HealthKit sync)
-    func refreshData() async {
+    /// Initialize the dashboard - request authorization and load data
+    func initialize() async {
+        guard !hasInitialized else { return }
+        hasInitialized = true
+        
+        // Setup observers now that we're initialized
+        setupObservers()
+        
         isLoading = true
         errorMessage = nil
         
-        do {
-            // 1. Sync with HealthKit
-            await dataSyncService.quickSync()
-            
-            // 2. Check for errors
-            if let syncError = dataSyncService.syncError {
-                throw syncError
-            }
-            
-            // 3. Load synced data from repository
-            await loadFromRepository()
-            
-        } catch {
-            errorMessage = error.localizedDescription
-            print("❌ Dashboard refresh error: \(error)")
+        // Check if HealthKit is available
+        guard HKHealthStore.isHealthDataAvailable() else {
+            errorMessage = "HealthKit is not available on this device"
+            isLoading = false
+            return
         }
+        
+        // Request authorization if needed
+        if !HealthKitManager.shared.isAuthorized {
+            do {
+                try await HealthKitManager.shared.requestAuthorization()
+                needsAuthorization = false
+            } catch {
+                errorMessage = "Please grant HealthKit access in Settings to use this app"
+                needsAuthorization = true
+                isLoading = false
+                return
+            }
+        }
+        
+        // Initialize stress monitoring
+        await stressMonitorVM.initialize()
+        
+        // Try to load data from repository first (might have cached data)
+        await loadFromRepository()
+        
+        // If no data exists, do initial sync
+        if metrics.date != Date().startOfDay {
+            await refreshData()
+        }
+        
+        isLoading = false
+    }
+    
+    /// Refresh all dashboard data (triggers HealthKit sync)
+    func refreshData() async {
+        // Don't sync if not authorized
+        guard HealthKitManager.shared.isAuthorized else {
+            errorMessage = "HealthKit access required"
+            needsAuthorization = true
+            return
+        }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        // 1. Sync with HealthKit
+        await dataSyncService.quickSync()
+        
+        // 2. Check for errors
+        if let syncError = dataSyncService.syncError {
+            // Don't show error if it's just "no data yet"
+            if syncError.localizedDescription.contains("No data") {
+                print("ℹ️ No data available yet")
+            } else {
+                errorMessage = syncError.localizedDescription
+                print("❌ Dashboard refresh error: \(syncError)")
+            }
+        }
+        
+        // 3. Load synced data from repository
+        await loadFromRepository()
         
         isLoading = false
     }
     
     /// Load data for a specific date
     func loadData(for date: Date) async {
+        guard HealthKitManager.shared.isAuthorized else {
+            errorMessage = "HealthKit access required"
+            needsAuthorization = true
+            return
+        }
+        
         isLoading = true
         errorMessage = nil
         
-        do {
-            // Sync that specific date
-            await dataSyncService.syncDate(date)
-            
-            // Load from repository
-            await loadFromRepository(for: date)
-            
-        } catch {
-            errorMessage = error.localizedDescription
+        // Sync that specific date
+        await dataSyncService.syncDate(date)
+        
+        // Check for sync errors
+        if let syncError = dataSyncService.syncError {
+            if !syncError.localizedDescription.contains("No data") {
+                errorMessage = syncError.localizedDescription
+            }
         }
+        
+        // Load from repository
+        await loadFromRepository(for: date)
         
         isLoading = false
     }
@@ -106,8 +167,10 @@ class DashboardViewModel: ObservableObject {
         if !HealthKitManager.shared.isAuthorized {
             do {
                 try await HealthKitManager.shared.requestAuthorization()
+                needsAuthorization = false
             } catch {
                 errorMessage = "Failed to authorize HealthKit"
+                needsAuthorization = true
                 isLoading = false
                 return
             }
@@ -125,33 +188,28 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func loadFromRepository(for date: Date = Date()) async {
-        do {
-            // Load today's metrics
-            guard let simpleDailyMetrics = try repository.fetchDailyMetrics(for: date) else {
-                // No data yet, keep sample data
-                print("⚠️ No data in repository for \(date.formatted())")
-                return
-            }
-            
-            // Load week data
-            let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: date)!
-            let weekMetrics = try repository.fetchDailyMetrics(from: weekStart, to: date)
-            
-            // Convert to UI models
-            let uiMetrics = convertToUIMetrics(simpleDailyMetrics)
-            let uiWeekData = convertToWeekData(weekMetrics)
-            
-            // Update UI
-            self.metrics = uiMetrics
-            self.weekData = uiWeekData
-            self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
-            
-            print("✅ Dashboard loaded with real data")
-            
-        } catch {
-            print("❌ Failed to load from repository: \(error)")
-            errorMessage = "Failed to load data"
+        // Load today's metrics
+        guard let simpleDailyMetrics = try? repository.fetchDailyMetrics(for: date) else {
+            // No data yet - this is normal for first launch
+            print("ℹ️ No data in repository for \(date.formatted())")
+            // Keep showing sample data
+            return
         }
+        
+        // Load week data
+        let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: date)!
+        let weekMetrics = (try? repository.fetchDailyMetrics(from: weekStart, to: date)) ?? []
+        
+        // Convert to UI models
+        let uiMetrics = convertToUIMetrics(simpleDailyMetrics)
+        let uiWeekData = convertToWeekData(weekMetrics)
+        
+        // Update UI
+        self.metrics = uiMetrics
+        self.weekData = uiWeekData
+        self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
+        
+        print("✅ Dashboard loaded with real data")
     }
     
     private func setupObservers() {

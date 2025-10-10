@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @AppStorage("userAge") private var userAge: Int = 30
-    @AppStorage("userWeight") private var userWeight: Double = 70.0
+    @AppStorage("userAge") private var userAge: Int = 20
+    @AppStorage("userWeight") private var userWeight: Double = 80.0
     @AppStorage("userGender") private var userGender: String = "Male"
     @AppStorage("notificationsEnabled") private var notificationsEnabled: Bool = true
     @AppStorage("dailyReminderTime") private var dailyReminderTime: Date = Calendar.current.date(from: DateComponents(hour: 9, minute: 0)) ?? Date()
