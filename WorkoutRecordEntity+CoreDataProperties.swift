@@ -2,15 +2,21 @@
 //  WorkoutRecordEntity+CoreDataProperties.swift
 //  StrainFitnessTracker
 //
-//  Created by Blake Burnley on 10/7/25.
+//  Created by Blake Burnley on 10/10/25.
 //
 //
 
 public import Foundation
+public import CoreData
+
 
 public typealias WorkoutRecordEntityCoreDataPropertiesSet = NSSet
 
 extension WorkoutRecordEntity {
+
+    @nonobjc public class func fetchRequest() -> NSFetchRequest<WorkoutRecordEntity> {
+        return NSFetchRequest<WorkoutRecordEntity>(entityName: "WorkoutRecordEntity")
+    }
 
     @NSManaged public var averageHeartRate: Double
     @NSManaged public var calories: Double
