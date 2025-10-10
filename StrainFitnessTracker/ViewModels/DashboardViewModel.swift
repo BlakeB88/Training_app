@@ -1,8 +1,8 @@
 //
-//  DashboardViewModel.swift (UPDATED WITH STRESS INTEGRATION)
+//  DashboardViewModel.swift - ENHANCED VERSION
 //  StrainFitnessTracker
 //
-//  Now uses persisted stress data from repository
+//  Now with better time tracking and force refresh capability
 //
 
 import Foundation
@@ -43,9 +43,57 @@ class DashboardViewModel: ObservableObject {
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
     }
     
-    // MARK: - Computed Properties
+    // MARK: - Computed Properties for Time Display
+    
+    /// Shows when the data was last synced from HealthKit
+    var lastSyncTime: String {
+        if let syncDate = dataSyncService.lastSyncDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return formatter.string(from: syncDate)
+        }
+        return "Never"
+    }
+    
+    /// Shows the timestamp of the most recent stress reading
+    var lastStressReadingTime: String {
+        if let lastReading = metrics.stressHistory.last {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return formatter.string(from: lastReading.timestamp)
+        }
+        return "No data"
+    }
+    
+    /// Combined display showing both reading time and sync time
     var lastStressUpdate: String {
-        // Use persisted data from metrics, or real-time from VM
+        if let lastReading = metrics.stressHistory.last {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            let readingTime = formatter.string(from: lastReading.timestamp)
+            
+            // Show sync time if significantly different from reading time
+            if let syncDate = dataSyncService.lastSyncDate,
+               abs(syncDate.timeIntervalSince(lastReading.timestamp)) > 60 { // More than 1 min difference
+                let syncTime = formatter.string(from: syncDate)
+                return "\(readingTime) (synced \(syncTime))"
+            }
+            
+            return readingTime
+        }
+        
+        // If no readings, show when we last tried to sync
+        if let syncDate = dataSyncService.lastSyncDate {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return "Synced \(formatter.string(from: syncDate))"
+        }
+        
+        return "No data"
+    }
+    
+    /// Simple display for cards - just the reading time
+    var lastStressUpdateSimple: String {
         if let lastReading = metrics.stressHistory.last {
             let formatter = DateFormatter()
             formatter.dateFormat = "h:mm a"
@@ -93,16 +141,17 @@ class DashboardViewModel: ObservableObject {
         // Try to load data from repository first (might have cached data)
         await loadFromRepository()
         
-        // If no data exists, do initial sync
-        if metrics.date != Date().startOfDay {
-            await refreshData()
+        // If no data exists or data is old, do initial sync with force refresh
+        let shouldForceRefresh = shouldRefreshData()
+        if metrics.date != Date().startOfDay || shouldForceRefresh {
+            await refreshData(forceRefresh: shouldForceRefresh)
         }
         
         isLoading = false
     }
     
     /// Refresh all dashboard data (triggers HealthKit sync)
-    func refreshData() async {
+    func refreshData(forceRefresh: Bool = true) async {
         // Don't sync if not authorized
         guard HealthKitManager.shared.isAuthorized else {
             errorMessage = "HealthKit access required"
@@ -113,8 +162,10 @@ class DashboardViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        // 1. Sync with HealthKit (now includes stress!)
-        await dataSyncService.quickSync()
+        print("🔄 Dashboard refresh requested (force: \(forceRefresh))")
+        
+        // 1. Sync with HealthKit (now includes force refresh option!)
+        await dataSyncService.quickSync(forceRefresh: forceRefresh)
         
         // 2. Check for errors
         if let syncError = dataSyncService.syncError {
@@ -131,10 +182,22 @@ class DashboardViewModel: ObservableObject {
         await loadFromRepository()
         
         isLoading = false
+        
+        print("✅ Dashboard refresh completed")
+    }
+    
+    /// Quick refresh of just stress data (lightweight)
+    func refreshStressData() async {
+        print("🔄 Refreshing stress data only...")
+        
+        await dataSyncService.refreshStressData()
+        await loadFromRepository()
+        
+        print("✅ Stress data refresh completed")
     }
     
     /// Load data for a specific date
-    func loadData(for date: Date) async {
+    func loadData(for date: Date, forceRefresh: Bool = false) async {
         guard HealthKitManager.shared.isAuthorized else {
             errorMessage = "HealthKit access required"
             needsAuthorization = true
@@ -145,7 +208,7 @@ class DashboardViewModel: ObservableObject {
         errorMessage = nil
         
         // Sync that specific date
-        await dataSyncService.syncDate(date)
+        await dataSyncService.syncDate(date, forceRefresh: forceRefresh)
         
         // Check for sync errors
         if let syncError = dataSyncService.syncError {
@@ -160,7 +223,7 @@ class DashboardViewModel: ObservableObject {
         isLoading = false
     }
     
-    /// Sync with HealthKit
+    /// Sync with HealthKit (full sync with force refresh)
     func syncHealthKit() async {
         isLoading = true
         
@@ -177,8 +240,8 @@ class DashboardViewModel: ObservableObject {
             }
         }
         
-        // Do full sync (last 7 days)
-        await dataSyncService.fullSync(days: 7)
+        // Do full sync (last 7 days) with force refresh
+        await dataSyncService.fullSync(days: 7, forceRefresh: true)
         
         // Load fresh data
         await loadFromRepository()
@@ -187,6 +250,39 @@ class DashboardViewModel: ObservableObject {
     }
     
     // MARK: - Private Methods
+    
+    /// Check if we should force refresh data
+    private func shouldRefreshData() -> Bool {
+        // Force refresh if no sync yet
+        guard let lastSync = dataSyncService.lastSyncDate else {
+            print("  ⚠️ No previous sync - will force refresh")
+            return true
+        }
+        
+        // Force refresh if last sync was more than 5 minutes ago
+        let minutesSinceSync = Date().timeIntervalSince(lastSync) / 60
+        if minutesSinceSync > 5 {
+            print("  ⚠️ Last sync was \(Int(minutesSinceSync)) minutes ago - will force refresh")
+            return true
+        }
+        
+        // Force refresh if we have no stress data
+        if metrics.stressHistory.isEmpty {
+            print("  ⚠️ No stress history - will force refresh")
+            return true
+        }
+        
+        // Check if stress data is stale (last reading > 15 minutes ago)
+        if let lastReading = metrics.stressHistory.last {
+            let minutesSinceReading = Date().timeIntervalSince(lastReading.timestamp) / 60
+            if minutesSinceReading > 15 {
+                print("  ⚠️ Last stress reading was \(Int(minutesSinceReading)) minutes ago - will force refresh")
+                return true
+            }
+        }
+        
+        return false
+    }
     
     private func loadFromRepository(for date: Date = Date()) async {
         print("📂 Loading from repository for \(date.formatted())...")
@@ -207,12 +303,18 @@ class DashboardViewModel: ObservableObject {
         print("  Strain: \(simpleDailyMetrics.strain)")
         print("  Recovery: \(simpleDailyMetrics.recovery ?? 0)")
         
-        // ✨ NEW: Log stress data
+        // ✨ Detailed stress logging
         print("  📊 STRESS METRICS:")
         print("    Average Stress: \(simpleDailyMetrics.averageStress ?? 0)")
         print("    Max Stress: \(simpleDailyMetrics.maxStress ?? 0)")
         print("    Stress Readings: \(simpleDailyMetrics.stressReadings?.count ?? 0)")
         print("    Time in High Stress: \(simpleDailyMetrics.timeInHighStress ?? 0)h")
+        print("    Time in Medium Stress: \(simpleDailyMetrics.timeInMediumStress ?? 0)h")
+        print("    Time in Low Stress: \(simpleDailyMetrics.timeInLowStress ?? 0)h")
+        
+        let lastUpdated = simpleDailyMetrics.lastUpdated
+        let minutesAgo = Int(Date().timeIntervalSince(lastUpdated) / 60)
+        print("    Last Updated: \(lastUpdated.formatted(date: .omitted, time: .shortened)) (\(minutesAgo) min ago)")
         
         // Load week data
         let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: date)!
@@ -231,6 +333,9 @@ class DashboardViewModel: ObservableObject {
         print("✅ Dashboard UI updated with real data")
         print("  UI Stress History Count: \(self.metrics.stressHistory.count)")
         print("  UI Current Stress: \(self.metrics.currentStress)")
+        
+        // Debug data freshness
+        debugStressDataFreshness()
     }
     
     private func setupObservers() {
@@ -244,7 +349,7 @@ class DashboardViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // ✨ UPDATED: Only use real-time stress for current reading updates
+        // ✨ Only use real-time stress for current reading updates
         // Historical stress comes from repository now
         stressMonitorVM.$currentStress
             .compactMap { $0 }
@@ -268,21 +373,27 @@ class DashboardViewModel: ObservableObject {
         
         // Add sleep activity if available
         var allActivities = activities
-        if let sleepDuration = simple.sleepDuration, sleepDuration > 0 {
+        if let sleepDuration = simple.sleepDuration,
+           sleepDuration > 0,
+           let sleepStart = simple.sleepStart {  // ← Add this condition
+            
+            // Now sleepStart is safely unwrapped
+            let sleepEnd = simple.sleepEnd ?? sleepStart.addingTimeInterval(sleepDuration * 3600)
+            
             let sleepActivity = Activity(
                 type: .sleep,
-                startTime: simple.sleepStart ?? simple.date,
-                endTime: simple.sleepEnd ?? simple.date.addingTimeInterval(sleepDuration * 3600),
+                startTime: sleepStart,  // ← No need for ?? now
+                endTime: sleepEnd,      // ← No need for ?? now
                 strain: nil,
                 duration: sleepDuration * 3600
             )
             allActivities.insert(sleepActivity, at: 0)
         }
         
-        // ✨ NEW: Convert stress readings from persisted data
+        // ✨ Convert stress readings from persisted data
         let stressHistory = convertStressReadings(simple.stressReadings ?? [], activities: allActivities)
         
-        // ✨ NEW: Use persisted stress or fall back to real-time
+        // ✨ Use persisted stress or fall back to real-time
         let currentStress = simple.averageStress ?? stressMonitorVM.currentStressLevel
         
         print("  📊 Converted stress data:")
@@ -311,7 +422,7 @@ class DashboardViewModel: ObservableObject {
             restingHeartRate: Int(simple.restingHeartRate ?? 60),
             vo2Max: simple.vo2Max ?? 0,
             
-            // ✨ NEW: Stress Metrics (from persisted data!)
+            // ✨ Stress Metrics (from persisted data!)
             currentStress: currentStress,
             stressHistory: stressHistory,
             
@@ -326,7 +437,7 @@ class DashboardViewModel: ObservableObject {
         return metrics
     }
 
-    /// ✨ NEW: Convert persisted StressReading objects to StressDataPoint for UI
+    /// ✨ Convert persisted StressReading objects to StressDataPoint for UI
     private func convertStressReadings(_ readings: [StressReading], activities: [Activity]) -> [StressDataPoint] {
         return readings.map { reading in
             // Try to match with an activity
@@ -469,5 +580,45 @@ class DashboardViewModel: ObservableObject {
             .vo2Max(value: metrics.vo2Max, baseline: 60),
             .averageHeartRate(value: metrics.averageHeartRate, baseline: 68)
         ]
+    }
+    
+    // MARK: - Debug Methods
+    
+    /// Debug info about stress data freshness
+    func debugStressDataFreshness() {
+        print("\n🕐 === STRESS DATA FRESHNESS ===")
+        print("Current time: \(Date().formatted(date: .omitted, time: .shortened))")
+        
+        if let syncDate = dataSyncService.lastSyncDate {
+            let minutesAgo = Int(Date().timeIntervalSince(syncDate) / 60)
+            print("Last sync: \(syncDate.formatted(date: .omitted, time: .shortened)) (\(minutesAgo) min ago)")
+        } else {
+            print("Last sync: Never")
+        }
+        
+        if let stressFetch = dataSyncService.lastStressDataFetch {
+            let minutesAgo = Int(Date().timeIntervalSince(stressFetch) / 60)
+            print("Last stress fetch: \(stressFetch.formatted(date: .omitted, time: .shortened)) (\(minutesAgo) min ago)")
+        } else {
+            print("Last stress fetch: Never")
+        }
+        
+        if let lastReading = metrics.stressHistory.last {
+            let minutesAgo = Int(Date().timeIntervalSince(lastReading.timestamp) / 60)
+            print("Last stress reading: \(lastReading.timestamp.formatted(date: .omitted, time: .shortened)) (\(minutesAgo) min ago)")
+            print("Reading value: \(String(format: "%.2f", lastReading.value))")
+        } else {
+            print("Last stress reading: None")
+        }
+        
+        print("Total readings today: \(metrics.stressHistory.count)")
+        
+        // Check if we have recent readings
+        let recentReadings = metrics.stressHistory.filter {
+            Date().timeIntervalSince($0.timestamp) < 15 * 60 // Last 15 minutes
+        }
+        print("Readings in last 15 min: \(recentReadings.count)")
+        
+        print("================================\n")
     }
 }
