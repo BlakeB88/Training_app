@@ -47,6 +47,7 @@ extension DailyMetricsEntity {
     @NSManaged public var timeInMediumStress: Double
     @NSManaged public var timeInLowStress: Double
     @NSManaged public var workouts: NSSet?
+    @NSManaged public var recentSleepDurationsData: Data?
 
 }
 
