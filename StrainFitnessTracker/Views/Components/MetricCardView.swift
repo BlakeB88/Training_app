@@ -56,7 +56,7 @@ struct MetricCardView: View {
 // MARK: - Convenience Initializers
 extension HealthMetric {
     static func respiratoryRate(value: Double, baseline: Double) -> HealthMetric {
-        let isPositive = value < baseline // Lower is better for respiratory rate
+        _ = value < baseline // Lower is better for respiratory rate
         let trend: Trend = value < baseline ? .down(isPositive: true) :
                           value > baseline ? .up(isPositive: false) : .stable
         
@@ -70,7 +70,7 @@ extension HealthMetric {
     }
     
     static func sleepEfficiency(value: Double, baseline: Double) -> HealthMetric {
-        let isPositive = value > baseline
+        _ = value > baseline
         let trend: Trend = value > baseline ? .up(isPositive: true) :
                           value < baseline ? .down(isPositive: false) : .stable
         
@@ -84,7 +84,7 @@ extension HealthMetric {
     }
     
     static func sleepConsistency(value: Double, baseline: Double) -> HealthMetric {
-        let isPositive = value > baseline
+        _ = value > baseline
         let trend: Trend = value > baseline ? .up(isPositive: true) :
                           value < baseline ? .down(isPositive: false) : .stable
         
@@ -103,7 +103,7 @@ extension HealthMetric {
         let baselineHours = Int(baseline) / 3600
         let baselineMinutes = (Int(baseline) % 3600) / 60
         
-        let isPositive = value > baseline
+        _ = value > baseline
         let trend: Trend = value > baseline ? .up(isPositive: true) :
                           value < baseline ? .down(isPositive: false) : .stable
         
@@ -122,7 +122,7 @@ extension HealthMetric {
         let baselineHours = Int(baseline) / 3600
         let baselineMinutes = (Int(baseline) % 3600) / 60
         
-        let isPositive = value < baseline // Lower debt is better
+        _ = value < baseline // Lower debt is better
         let trend: Trend = value < baseline ? .down(isPositive: true) :
                           value > baseline ? .up(isPositive: false) : .stable
         
@@ -136,7 +136,7 @@ extension HealthMetric {
     }
     
     static func restorativeSleep(value: Double, baseline: Double) -> HealthMetric {
-        let isPositive = value > baseline
+        _ = value > baseline
         let trend: Trend = value > baseline ? .up(isPositive: true) :
                           value < baseline ? .down(isPositive: false) : .stable
         
@@ -150,7 +150,7 @@ extension HealthMetric {
     }
     
     static func vo2Max(value: Double, baseline: Double) -> HealthMetric {
-        let isPositive = value > baseline
+        _ = value > baseline
         let trend: Trend = value > baseline ? .up(isPositive: true) :
                           value < baseline ? .down(isPositive: false) : .stable
         
@@ -177,7 +177,7 @@ extension HealthMetric {
     }
     
     static func steps(value: Int, baseline: Int) -> HealthMetric {
-        let isPositive = value > baseline
+        _ = value > baseline
         let trend: Trend = value > baseline ? .up(isPositive: true) :
                           value < baseline ? .down(isPositive: false) : .stable
         
@@ -204,7 +204,7 @@ extension HealthMetric {
     }
     
     static func calories(value: Int, baseline: Int) -> HealthMetric {
-        let isPositive = value > baseline
+        _ = value > baseline
         let trend: Trend = value > baseline ? .up(isPositive: true) :
                           value < baseline ? .down(isPositive: false) : .stable
         
@@ -223,7 +223,7 @@ extension HealthMetric {
         let baselineHours = Int(baseline) / 3600
         let baselineMinutes = (Int(baseline) % 3600) / 60
         
-        let isPositive = value > baseline
+        _ = value > baseline
         let trend: Trend = value > baseline ? .up(isPositive: true) :
                           value < baseline ? .down(isPositive: false) : .stable
         

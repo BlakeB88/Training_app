@@ -7,89 +7,130 @@ struct PermissionsView: View {
     @State private var isLoading = false
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showSuccess = false
+    
+    @Environment(\.dismiss) private var dismiss
     
     var body: some View {
-        List {
-            Section {
-                Text("StrainFitnessTracker needs access to your health data to calculate strain and recovery metrics.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
+        ZStack {
+            Color.appBackground.ignoresSafeArea()
             
-            Section {
-                PermissionRow(
-                    title: "Workouts",
-                    icon: "figure.run",
-                    color: .orange,
-                    status: getStatus(for: HKObjectType.workoutType())
-                )
-                
-                PermissionRow(
-                    title: "Heart Rate",
-                    icon: "heart.fill",
-                    color: .red,
-                    status: getStatus(for: HKQuantityType.quantityType(forIdentifier: .heartRate)!)
-                )
-                
-                PermissionRow(
-                    title: "Heart Rate Variability",
-                    icon: "waveform.path.ecg",
-                    color: .purple,
-                    status: getStatus(for: HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!)
-                )
-                
-                PermissionRow(
-                    title: "Resting Heart Rate",
-                    icon: "heart.text.square",
-                    color: .pink,
-                    status: getStatus(for: HKQuantityType.quantityType(forIdentifier: .restingHeartRate)!)
-                )
-                
-                PermissionRow(
-                    title: "Sleep Analysis",
-                    icon: "bed.double.fill",
-                    color: .blue,
-                    status: getStatus(for: HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!)
-                )
-                
-                PermissionRow(
-                    title: "Active Energy",
-                    icon: "flame.fill",
-                    color: .orange,
-                    status: getStatus(for: HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!)
-                )
-            } header: {
-                Text("Required Permissions")
-            }
-            
-            Section {
-                Button {
-                    requestAuthorization()
-                } label: {
-                    HStack {
-                        Spacer()
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle())
-                        } else {
-                            Text("Request Access")
-                                .fontWeight(.semibold)
-                        }
-                        Spacer()
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 12) {
+                        Image(systemName: "heart.text.square.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.accentBlue)
+                        
+                        Text("Health Permissions")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.primaryText)
+                        
+                        Text("StrainFitnessTracker needs access to your health data to calculate strain and recovery metrics.")
+                            .font(.system(size: 16))
+                            .foregroundColor(.secondaryText)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
                     }
+                    .padding(.top, 40)
+                    
+                    // Permission Cards
+                    VStack(spacing: 12) {
+                        PermissionCard(
+                            title: "Workouts",
+                            icon: "figure.run",
+                            color: .orange,
+                            description: "Track your activities and calculate strain",
+                            status: getStatus(for: HKObjectType.workoutType())
+                        )
+                        
+                        PermissionCard(
+                            title: "Heart Rate",
+                            icon: "heart.fill",
+                            color: .red,
+                            description: "Monitor real-time stress levels",
+                            status: getStatus(for: HKQuantityType.quantityType(forIdentifier: .heartRate)!)
+                        )
+                        
+                        PermissionCard(
+                            title: "Heart Rate Variability",
+                            icon: "waveform.path.ecg",
+                            color: .purple,
+                            description: "Calculate recovery scores",
+                            status: getStatus(for: HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!)
+                        )
+                        
+                        PermissionCard(
+                            title: "Resting Heart Rate",
+                            icon: "heart.text.square",
+                            color: .pink,
+                            description: "Track baseline health metrics",
+                            status: getStatus(for: HKQuantityType.quantityType(forIdentifier: .restingHeartRate)!)
+                        )
+                        
+                        PermissionCard(
+                            title: "Sleep Analysis",
+                            icon: "bed.double.fill",
+                            color: .sleepBlue,
+                            description: "Analyze sleep quality and duration",
+                            status: getStatus(for: HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!)
+                        )
+                        
+                        PermissionCard(
+                            title: "Active Energy",
+                            icon: "flame.fill",
+                            color: .warningOrange,
+                            description: "Track calories burned during activities",
+                            status: getStatus(for: HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned)!)
+                        )
+                    }
+                    .padding(.horizontal)
+                    
+                    // Request Button
+                    Button {
+                        requestAuthorization()
+                    } label: {
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Text("Grant Access")
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color.accentBlue)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .disabled(isLoading)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    
+                    // Footer
+                    Text("You can change these permissions anytime in the Health app under Sources.")
+                        .font(.system(size: 13))
+                        .foregroundColor(.tertiaryText)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 40)
                 }
-                .disabled(isLoading)
-            } footer: {
-                Text("You can change these permissions anytime in the Health app under Sources.")
-                    .font(.caption)
             }
         }
-        .navigationTitle("Health Permissions")
-        .navigationBarTitleDisplayMode(.inline)
         .alert("Error", isPresented: $showError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(errorMessage)
+        }
+        .alert("Success!", isPresented: $showSuccess) {
+            Button("Continue") {
+                dismiss()
+            }
+        } message: {
+            Text("Health permissions granted. You can now start tracking your fitness metrics!")
         }
         .onAppear {
             checkAuthorizationStatus()
@@ -138,6 +179,7 @@ struct PermissionsView: View {
                 
                 if success {
                     checkAuthorizationStatus()
+                    showSuccess = true
                 } else if let error = error {
                     errorMessage = error.localizedDescription
                     showError = true
@@ -147,24 +189,46 @@ struct PermissionsView: View {
     }
 }
 
-struct PermissionRow: View {
+struct PermissionCard: View {
     let title: String
     let icon: String
     let color: Color
+    let description: String
     let status: PermissionStatus
     
     var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundColor(color)
-                .frame(width: 30)
+        HStack(spacing: 16) {
+            // Icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(color.opacity(0.15))
+                    .frame(width: 50, height: 50)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 24))
+                    .foregroundColor(color)
+            }
             
-            Text(title)
+            // Content
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.primaryText)
+                
+                Text(description)
+                    .font(.system(size: 13))
+                    .foregroundColor(.secondaryText)
+                    .lineLimit(2)
+            }
             
             Spacer()
             
+            // Status Badge
             statusBadge
         }
+        .padding(16)
+        .background(Color.cardBackground)
+        .cornerRadius(16)
     }
     
     @ViewBuilder
@@ -172,13 +236,16 @@ struct PermissionRow: View {
         switch status {
         case .authorized:
             Image(systemName: "checkmark.circle.fill")
-                .foregroundColor(.green)
+                .foregroundColor(.recoveryGreen)
+                .font(.system(size: 22))
         case .denied:
             Image(systemName: "xmark.circle.fill")
                 .foregroundColor(.red)
+                .font(.system(size: 22))
         case .notDetermined:
-            Image(systemName: "questionmark.circle.fill")
-                .foregroundColor(.gray)
+            Image(systemName: "circle")
+                .foregroundColor(.tertiaryText)
+                .font(.system(size: 22))
         }
     }
 }

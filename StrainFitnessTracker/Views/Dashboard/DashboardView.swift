@@ -2,13 +2,17 @@
 //  DashboardView.swift
 //  StrainFitnessTracker
 //
-//  Main dashboard view matching Whoop design with current branding
+//  Main dashboard view - FIXED to use real HealthKit data
 //
 
 import SwiftUI
 
 struct DashboardView: View {
-    @StateObject private var viewModel = DashboardViewModel()
+    @StateObject private var viewModel = DashboardViewModel(
+        dataSyncService: .shared,
+        repository: MetricsRepository(),
+        stressMonitorVM: StressMonitorViewModel(healthKitManager: HealthKitManager.shared)
+    )
     @State private var selectedDate = Date()
     
     var body: some View {
@@ -16,31 +20,63 @@ struct DashboardView: View {
             ZStack {
                 Color.appBackground.ignoresSafeArea()
                 
-                ScrollView {
+                if viewModel.isLoading {
                     VStack(spacing: 20) {
-                        // Header Section
-                        headerSection
-                        
-                        // Primary Metrics (Sleep, Recovery, Strain)
-                        primaryMetricsSection
-                        
-                        // Health & Stress Monitor Cards
-                        monitorCardsSection
-                        
-                        // My Day Section
-                        myDaySection
-                        
-                        // My Dashboard (Detailed Metrics)
-                        myDashboardSection
-                        
-                        // Stress Monitor Graph
-                        stressMonitorSection
-                        
-                        // Strain & Recovery Chart
-                        strainRecoverySection
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading health data...")
+                            .font(.headline)
+                            .foregroundColor(.secondaryText)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 100) // Space for tab bar
+                } else {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // Header Section
+                            headerSection
+                            
+                            // Primary Metrics (Sleep, Recovery, Strain)
+                            primaryMetricsSection
+                            
+                            // Health & Stress Monitor Cards
+                            monitorCardsSection
+                            
+                            // My Day Section
+                            myDaySection
+                            
+                            // My Dashboard (Detailed Metrics)
+                            myDashboardSection
+                            
+                            // Stress Monitor Graph
+                            stressMonitorSection
+                            
+                            // Strain & Recovery Chart
+                            strainRecoverySection
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 100) // Space for tab bar
+                    }
+                    .refreshable {
+                        await viewModel.refreshData()
+                    }
+                }
+                
+                // Error message
+                if let error = viewModel.errorMessage {
+                    VStack {
+                        Spacer()
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.warningOrange)
+                            Text(error)
+                                .foregroundColor(.primaryText)
+                                .font(.subheadline)
+                        }
+                        .padding()
+                        .background(Color.cardBackground)
+                        .cornerRadius(12)
+                        .shadow(radius: 8)
+                        .padding()
+                    }
                 }
                 
                 // Floating Action Button
@@ -78,13 +114,26 @@ struct DashboardView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        // Settings action
+                        Task {
+                            await viewModel.syncHealthKit()
+                        }
                     }) {
-                        Image(systemName: "gearshape.fill")
+                        Image(systemName: "arrow.clockwise")
                             .font(.system(size: 20))
                             .foregroundColor(.secondaryText)
                     }
                 }
+            }
+        }
+        .task {
+            // Load data when view appears
+            print("📱 Dashboard appeared, loading data...")
+            await viewModel.refreshData()
+        }
+        .onChange(of: selectedDate) { _, newDate in
+            Task {
+                print("📅 Date changed to \(newDate)")
+                await viewModel.loadData(for: newDate)
             }
         }
     }
@@ -151,11 +200,11 @@ struct DashboardView: View {
             
             // Device battery
             HStack(spacing: 4) {
-                Image(systemName: "watch")
+                Image(systemName: "applewatch")
                     .font(.system(size: 14))
                     .foregroundColor(.secondaryText)
                 
-                Text("62%")
+                Text("--")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.secondaryText)
             }
@@ -167,7 +216,7 @@ struct DashboardView: View {
     private var primaryMetricsSection: some View {
         VStack(spacing: 16) {
             // App title
-            Text("WHOOP")
+            Text("TRAIN")
                 .font(.system(size: 16, weight: .bold))
                 .foregroundColor(.secondaryText)
                 .tracking(4)
@@ -224,23 +273,43 @@ struct DashboardView: View {
             DailyOutlookCard()
             
             // Today's Activities
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text("TODAY'S ACTIVITIES")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.secondaryText)
-                        .tracking(1)
+            if !viewModel.metrics.activities.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("TODAY'S ACTIVITIES")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.secondaryText)
+                            .tracking(1)
+                        
+                        Spacer()
+                        
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondaryText)
+                    }
                     
-                    Spacer()
-                    
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: 12))
+                    ForEach(viewModel.metrics.activities) { activity in
+                        ActivityCardView(activity: activity)
+                    }
+                }
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "figure.walk")
+                        .font(.system(size: 40))
                         .foregroundColor(.secondaryText)
+                    
+                    Text("No activities yet today")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondaryText)
+                    
+                    Text("Start tracking your workouts!")
+                        .font(.system(size: 14))
+                        .foregroundColor(.tertiaryText)
                 }
-                
-                ForEach(viewModel.metrics.activities) { activity in
-                    ActivityCardView(activity: activity)
-                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 30)
+                .background(Color.cardBackground)
+                .cornerRadius(16)
             }
             
             // Action buttons
@@ -321,11 +390,28 @@ struct DashboardView: View {
     // MARK: - Stress Monitor Section
     private var stressMonitorSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            StressMonitorView(
-                stressData: viewModel.metrics.stressHistory,
-                currentStress: viewModel.metrics.currentStress,
-                activities: viewModel.metrics.activities
-            )
+            if !viewModel.metrics.stressHistory.isEmpty {
+                StressMonitorView(
+                    stressData: viewModel.metrics.stressHistory,
+                    currentStress: viewModel.metrics.currentStress,
+                    activities: viewModel.metrics.activities
+                )
+            } else {
+                // Empty state for stress
+                VStack(spacing: 12) {
+                    Image(systemName: "heart.text.square")
+                        .font(.system(size: 40))
+                        .foregroundColor(.secondaryText)
+                    
+                    Text("Stress data will appear here")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(.secondaryText)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 40)
+                .background(Color.cardBackground)
+                .cornerRadius(20)
+            }
         }
     }
     
