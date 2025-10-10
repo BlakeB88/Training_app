@@ -13,7 +13,7 @@ struct MainTabView: View {
     enum Tab {
         case home
         case health
-        case community
+        case stress
         case more
     }
     
@@ -26,8 +26,8 @@ struct MainTabView: View {
                     DashboardView()
                 case .health:
                     HealthView()
-                case .community:
-                    CommunityView()
+                case .stress:
+                    StressView()
                 case .more:
                     MoreView()
                 }
@@ -52,11 +52,11 @@ struct MainTabView: View {
                 }
                 
                 TabBarButton(
-                    icon: "person.3.fill",
-                    label: "Community",
-                    isSelected: selectedTab == .community
+                    icon: "brain.head.profile",
+                    label: "Stress",
+                    isSelected: selectedTab == .stress
                 ) {
-                    selectedTab = .community
+                    selectedTab = .stress
                 }
                 
                 TabBarButton(
@@ -122,20 +122,162 @@ struct HealthView: View {
     }
 }
 
-struct CommunityView: View {
+struct StressView: View {
+    @StateObject private var viewModel = DashboardViewModel(
+        dataSyncService: .shared,
+        repository: MetricsRepository(),
+        stressMonitorVM: StressMonitorViewModel(healthKitManager: HealthKitManager.shared)
+    )
+    
     var body: some View {
-        ZStack {
-            Color.appBackground.ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                Text("Community")
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundColor(.primaryText)
+        NavigationView {
+            ZStack {
+                Color.appBackground.ignoresSafeArea()
                 
-                Text("Connect with other users and teams")
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondaryText)
+                if viewModel.isLoading {
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading stress data...")
+                            .font(.headline)
+                            .foregroundColor(.secondaryText)
+                    }
+                } else {
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            // Current Stress Card
+                            VStack(spacing: 16) {
+                                HStack {
+                                    Text("Current Stress Level")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundColor(.primaryText)
+                                    
+                                    Spacer()
+                                }
+                                
+                                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                    Text(String(format: "%.1f", viewModel.metrics.currentStress))
+                                        .font(.system(size: 60, weight: .bold, design: .rounded))
+                                        .foregroundColor(.primaryText)
+                                    
+                                    Text(stressLevel.uppercased())
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundColor(stressLevelColor)
+                                        .tracking(0.5)
+                                }
+                                
+                                Text("Last updated \(formattedLastUpdate)")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.tertiaryText)
+                            }
+                            .padding(24)
+                            .frame(maxWidth: .infinity)
+                            .background(Color.cardBackground)
+                            .cornerRadius(20)
+                            
+                            // Stress Monitor Chart
+                            if !viewModel.metrics.stressHistory.isEmpty {
+                                StressMonitorView(
+                                    stressData: viewModel.metrics.stressHistory,
+                                    currentStress: viewModel.metrics.currentStress,
+                                    activities: viewModel.metrics.activities
+                                )
+                            }
+                            
+                            // Stress Tips Card
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Managing Stress")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(.primaryText)
+                                
+                                VStack(alignment: .leading, spacing: 8) {
+                                    StressTipRow(icon: "leaf.fill", text: "Take deep breaths")
+                                    StressTipRow(icon: "figure.walk", text: "Go for a short walk")
+                                    StressTipRow(icon: "moon.stars.fill", text: "Get quality sleep")
+                                    StressTipRow(icon: "drop.fill", text: "Stay hydrated")
+                                }
+                            }
+                            .padding(24)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.cardBackground)
+                            .cornerRadius(20)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 100)
+                    }
+                    .refreshable {
+                        await viewModel.refreshData()
+                    }
+                }
             }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Text("Stress Monitor")
+                        .font(.system(size: 34, weight: .bold))
+                        .foregroundColor(.primaryText)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        Task {
+                            await viewModel.syncHealthKit()
+                        }
+                    }) {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 20))
+                            .foregroundColor(.secondaryText)
+                    }
+                }
+            }
+        }
+        .task {
+            await viewModel.refreshData()
+        }
+    }
+    
+    private var stressLevel: String {
+        if viewModel.metrics.currentStress < 1.0 {
+            return "Low"
+        } else if viewModel.metrics.currentStress < 2.0 {
+            return "Medium"
+        } else {
+            return "High"
+        }
+    }
+    
+    private var stressLevelColor: Color {
+        if viewModel.metrics.currentStress < 1.0 {
+            return .stressLow
+        } else if viewModel.metrics.currentStress < 2.0 {
+            return .stressMedium
+        } else {
+            return .stressHigh
+        }
+    }
+    
+    private var formattedLastUpdate: String {
+        guard let lastPoint = viewModel.metrics.stressHistory.last else { return "N/A" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: lastPoint.timestamp)
+    }
+}
+
+struct StressTipRow: View {
+    let icon: String
+    let text: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 16))
+                .foregroundColor(.accentBlue)
+                .frame(width: 24)
+            
+            Text(text)
+                .font(.system(size: 15))
+                .foregroundColor(.secondaryText)
         }
     }
 }
