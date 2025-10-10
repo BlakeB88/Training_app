@@ -2,7 +2,7 @@
 //  DashboardView.swift
 //  StrainFitnessTracker
 //
-//  Main dashboard view - FIXED to use real HealthKit data
+//  Main dashboard view - UPDATED to properly display stress data
 //
 
 import SwiftUI
@@ -46,7 +46,7 @@ struct DashboardView: View {
                             // My Dashboard (Detailed Metrics)
                             myDashboardSection
                             
-                            // Stress Monitor Graph
+                            // Stress Monitor Graph - UPDATED
                             stressMonitorSection
                             
                             // Strain & Recovery Chart
@@ -56,7 +56,7 @@ struct DashboardView: View {
                         .padding(.bottom, 100) // Space for tab bar
                     }
                     .refreshable {
-                        await viewModel.initialize()
+                        await viewModel.refreshData()
                     }
                 }
                 
@@ -126,9 +126,9 @@ struct DashboardView: View {
             }
         }
         .task {
-            // Load data when view appears
-            print("📱 Dashboard appeared, loading data...")
-            await viewModel.refreshData()
+            // Initialize and load data when view appears
+            print("📱 Dashboard appeared, initializing...")
+            await viewModel.initialize()
         }
         .onChange(of: selectedDate) { _, newDate in
             Task {
@@ -392,7 +392,7 @@ struct DashboardView: View {
         }
     }
     
-    // MARK: - Stress Monitor Section
+    // MARK: - Stress Monitor Section - UPDATED
     private var stressMonitorSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !viewModel.metrics.stressHistory.isEmpty {
@@ -402,7 +402,7 @@ struct DashboardView: View {
                     activities: viewModel.metrics.activities
                 )
             } else {
-                // Empty state for stress
+                // Empty state with debug info
                 VStack(spacing: 12) {
                     Image(systemName: "heart.text.square")
                         .font(.system(size: 40))
@@ -411,6 +411,19 @@ struct DashboardView: View {
                     Text("Stress data will appear here")
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(.secondaryText)
+                    
+                    Text("Current stress: \(String(format: "%.1f", viewModel.metrics.currentStress))")
+                        .font(.system(size: 12))
+                        .foregroundColor(.tertiaryText)
+                    
+                    Button("Refresh Data") {
+                        Task {
+                            await viewModel.refreshData()
+                        }
+                    }
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.accentBlue)
+                    .padding(.top, 8)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 40)
