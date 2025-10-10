@@ -234,7 +234,7 @@ class DataSyncService: ObservableObject {
         
         // 4. Fetch physiological metrics
         print("  ❤️ Fetching physiological metrics...")
-        async let hrvTask = healthKitManager.fetchLatestHRV()
+        async let hrvTask = calculateAverageHRV(for: date)
         async let rhrTask = healthKitManager.fetchRestingHeartRate()
         async let respRateTask = healthKitManager.fetchRespiratoryRate()
         async let vo2MaxTask = healthKitManager.fetchLatestVO2Max()
@@ -343,6 +343,31 @@ class DataSyncService: ObservableObject {
         print("   Stress: Avg=\(String(format: "%.1f", stressData.average)), Max=\(String(format: "%.1f", stressData.max)), Readings=\(stressData.readings.count)")
         
         return metrics
+    }
+    
+    private func calculateAverageHRV(for date: Date) async throws -> Double? {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        
+        // First, try to get morning HRV (most reliable reading)
+        if let morningHRV = try? await hrvQuery.fetchMorningHRV(for: date) {
+            print("  ✅ Morning HRV for \(date.formatted(.dateTime.month().day())): \(String(format: "%.1f", morningHRV)) ms")
+            return morningHRV
+        }
+        
+        // If no morning reading, fetch all HRV readings for this day
+        let hrvReadings = try await hrvQuery.fetchHRVReadings(from: startOfDay, to: endOfDay)
+        
+        guard !hrvReadings.isEmpty else {
+            print("  ⚠️ No HRV readings found for \(date.formatted(.dateTime.month().day()))")
+            return nil
+        }
+        
+        let average = hrvReadings.reduce(0.0, +) / Double(hrvReadings.count)
+        print("  ✅ HRV average for \(date.formatted(.dateTime.month().day())): \(String(format: "%.1f", average)) ms (from \(hrvReadings.count) readings)")
+        
+        return average
     }
 
     // MARK: - ENHANCED: Stress Calculation Methods
