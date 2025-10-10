@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24299" systemVersion="24G90" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
     <entity name="DailyMetricsEntity" representedClassName="DailyMetricsEntity" syncable="YES">
+        <attribute name="activeCalories" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="averageHeartRate" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="baselineData" optional="YES" attributeType="Binary"/>
         <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="hrvAverage" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
@@ -10,10 +12,17 @@
         <attribute name="recoveryComponentsData" optional="YES" attributeType="Binary"/>
         <attribute name="respiratoryRate" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="restingHeartRate" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="restorativeSleepPercentage" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="sleepConsistency" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="sleepDebt" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="sleepDuration" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="sleepEfficiency" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="sleepEnd" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="sleepStart" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="steps" optional="YES" attributeType="Integer 32" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="strain" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="timeInBed" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="vo2Max" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <relationship name="workouts" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="WorkoutRecordEntity" inverseName="dailyMetrics" inverseEntity="WorkoutRecordEntity"/>
     </entity>
     <entity name="WorkoutRecordEntity" representedClassName="WorkoutRecordEntity" syncable="YES">

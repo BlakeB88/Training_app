@@ -276,33 +276,113 @@ class DashboardViewModel: ObservableObject {
             sleepScore: sleepScore,
             recoveryScore: simple.recovery ?? 0,
             strainScore: simple.strain,
+            
+            // Sleep Metrics - NOW USING REAL DATA
             sleepDuration: (simple.sleepDuration ?? 0) * 3600,
-            restorativeSleepPercentage: 0, // Not tracked in SimpleDailyMetrics
-            sleepEfficiency: 0,
-            sleepConsistency: 0,
-            timeInBed: 0,
-            sleepDebt: 0,
-            respiratoryRate: simple.baselineMetrics?.respiratoryRateBaseline ?? 14.0,
-            calories: Int(simple.workouts.reduce(0.0) { $0 + $1.calories }),
-            steps: 0, // Not tracked
-            averageHeartRate: Int(simple.restingHeartRate ?? 60),
+            restorativeSleepPercentage: simple.restorativeSleepPercentage ?? 0,
+            sleepEfficiency: simple.sleepEfficiency ?? 0,
+            sleepConsistency: simple.sleepConsistency ?? 0,
+            timeInBed: (simple.timeInBed ?? 0) * 3600,
+            sleepDebt: (simple.sleepDebt ?? 0) * 3600,
+            respiratoryRate: simple.respiratoryRate ?? simple.baselineMetrics?.respiratoryRateBaseline ?? 14.0,
+            
+            // Activity Metrics - NOW USING REAL DATA
+            calories: Int(simple.activeCalories ?? 0),
+            steps: simple.steps ?? 0,
+            averageHeartRate: Int(simple.averageHeartRate ?? simple.restingHeartRate ?? 60),
             restingHeartRate: Int(simple.restingHeartRate ?? 60),
-            vo2Max: 0, // Not tracked
+            vo2Max: simple.vo2Max ?? 0,
+            
+            // Stress Metrics
             currentStress: stressMonitorVM.currentStressLevel,
             stressHistory: convertStressHistory(),
+            
+            // Activities
             activities: allActivities,
+            
+            // Health Monitor
             healthMetricsInRange: calculateMetricsInRange(simple),
             totalHealthMetrics: 5
         )
     }
-    
+
+    /// Improved sleep score calculation using multiple factors
     private func calculateSleepScore(_ metrics: SimpleDailyMetrics) -> Double {
         guard let duration = metrics.sleepDuration else { return 0 }
         
-        // Simple scoring: optimal is 8 hours
-        let optimal = 8.0
-        let score = min(100.0, (duration / optimal) * 100.0)
-        return score
+        var score = 0.0
+        let weights: [String: Double] = [
+            "duration": 0.4,
+            "efficiency": 0.3,
+            "restorative": 0.2,
+            "consistency": 0.1
+        ]
+        
+        // Duration score (optimal: 7-9 hours)
+        let durationScore: Double
+        if duration >= 7 && duration <= 9 {
+            durationScore = 100
+        } else if duration < 7 {
+            durationScore = max(0, (duration / 7.0) * 100)
+        } else {
+            // Penalize over-sleeping less than under-sleeping
+            durationScore = max(60, 100 - ((duration - 9) * 10))
+        }
+        score += durationScore * weights["duration"]!
+        
+        // Efficiency score
+        let efficiencyScore = metrics.sleepEfficiency ?? 70
+        score += efficiencyScore * weights["efficiency"]!
+        
+        // Restorative sleep score
+        let restorativeScore = min(100, (metrics.restorativeSleepPercentage ?? 25) * 2.5)
+        score += restorativeScore * weights["restorative"]!
+        
+        // Consistency score
+        let consistencyScore = metrics.sleepConsistency ?? 50
+        score += consistencyScore * weights["consistency"]!
+        
+        return min(100, max(0, score))
+    }
+
+    /// Improved metrics in range calculation
+    private func calculateMetricsInRange(_ metrics: SimpleDailyMetrics) -> Int {
+        var inRange = 0
+        let totalMetrics = 5
+        
+        // 1. Check HRV (within 15% of baseline)
+        if let hrv = metrics.hrvAverage,
+           let baseline = metrics.baselineMetrics?.hrvBaseline {
+            let percentDiff = abs(hrv - baseline) / baseline
+            if percentDiff < 0.15 {
+                inRange += 1
+            }
+        }
+        
+        // 2. Check RHR (within 5 bpm of baseline)
+        if let rhr = metrics.restingHeartRate,
+           let baseline = metrics.baselineMetrics?.rhrBaseline {
+            if abs(rhr - baseline) < 5 {
+                inRange += 1
+            }
+        }
+        
+        // 3. Check Sleep Duration (7+ hours)
+        if let sleep = metrics.sleepDuration, sleep >= 7 {
+            inRange += 1
+        }
+        
+        // 4. Check Recovery (70%+ is good)
+        if let recovery = metrics.recovery, recovery >= 70 {
+            inRange += 1
+        }
+        
+        // 5. Check Strain (not overtraining - below 18)
+        if metrics.strain < 18 {
+            inRange += 1
+        }
+        
+        return inRange
     }
     
     private func convertWorkoutsToActivities(_ workouts: [WorkoutSummary]) -> [Activity] {
@@ -337,43 +417,6 @@ class DashboardViewModel: ObservableObject {
         }
     }
     
-    private func calculateMetricsInRange(_ metrics: SimpleDailyMetrics) -> Int {
-        var inRange = 0
-        
-        // Check HRV
-        if let hrv = metrics.hrvAverage,
-           let baseline = metrics.baselineMetrics?.hrvBaseline {
-            if abs(hrv - baseline) / baseline < 0.15 { // Within 15%
-                inRange += 1
-            }
-        }
-        
-        // Check RHR
-        if let rhr = metrics.restingHeartRate,
-           let baseline = metrics.baselineMetrics?.rhrBaseline {
-            if abs(rhr - baseline) < 5 { // Within 5 bpm
-                inRange += 1
-            }
-        }
-        
-        // Check Sleep
-        if let sleep = metrics.sleepDuration, sleep >= 7 {
-            inRange += 1
-        }
-        
-        // Check Recovery
-        if let recovery = metrics.recovery, recovery >= 70 {
-            inRange += 1
-        }
-        
-        // Check Strain (not overtraining)
-        if metrics.strain < 18 {
-            inRange += 1
-        }
-        
-        return inRange
-    }
-    
     private func convertToWeekData(_ weekMetrics: [SimpleDailyMetrics]) -> StrainRecoveryWeekData {
         let dayData = weekMetrics.map { metrics in
             StrainRecoveryWeekData.DayData(
@@ -403,3 +446,4 @@ class DashboardViewModel: ObservableObject {
         ]
     }
 }
+

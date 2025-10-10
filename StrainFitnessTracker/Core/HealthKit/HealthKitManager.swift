@@ -26,7 +26,9 @@ class HealthKitManager: ObservableObject {
         HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
         HKObjectType.quantityType(forIdentifier: .distanceSwimming)!,
         HKObjectType.quantityType(forIdentifier: .respiratoryRate)!,
-        HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!
+        HKObjectType.categoryType(forIdentifier: .sleepAnalysis)!,
+        HKObjectType.quantityType(forIdentifier: .stepCount)!,
+        HKObjectType.quantityType(forIdentifier: .vo2Max)!
     ]
     
     private init() {}
@@ -410,6 +412,212 @@ class HealthKitManager: ObservableObject {
             }
             
             healthStore.execute(query)
+        }
+    }
+    
+    //
+    // Add these new query methods to your HealthKitManager.swift file
+    // Insert them after the existing query methods
+    //
+
+    // MARK: - Steps Queries
+
+    /// Fetch step count for a specific date range
+    func fetchStepCount(from startDate: Date, to endDate: Date) async throws -> Int {
+        guard let stepsType = HKQuantityType.quantityType(forIdentifier: .stepCount) else {
+            throw HealthKitError.notAvailable
+        }
+        
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsQuery(
+                quantityType: stepsType,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum
+            ) { _, result, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                let steps = result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0
+                continuation.resume(returning: Int(steps))
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+
+    /// Fetch today's step count
+    func fetchTodaySteps() async throws -> Int {
+        let today = Calendar.current.startOfDay(for: Date())
+        let now = Date()
+        return try await fetchStepCount(from: today, to: now)
+    }
+
+    // MARK: - VO2 Max Queries
+
+    /// Fetch the latest VO2 Max reading
+    func fetchLatestVO2Max() async throws -> Double? {
+        guard let vo2MaxType = HKQuantityType.quantityType(forIdentifier: .vo2Max) else {
+            throw HealthKitError.notAvailable
+        }
+        
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: vo2MaxType,
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                guard let sample = samples?.first as? HKQuantitySample else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                
+                let vo2Max = sample.quantity.doubleValue(for: HKUnit.literUnit(with: .milli).unitDivided(by: HKUnit.gramUnit(with: .kilo).unitMultiplied(by: .minute())))
+                continuation.resume(returning: vo2Max)
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+
+    // MARK: - Enhanced Sleep Queries
+
+    /// Fetch detailed sleep data including time in bed
+    func fetchDetailedSleepData(from startDate: Date, to endDate: Date) async throws -> SleepData {
+        let sleepType = HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: sleepType,
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: [NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: true)]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                guard let sleepSamples = samples as? [HKCategorySample], !sleepSamples.isEmpty else {
+                    continuation.resume(returning: SleepData(
+                        totalSleepDuration: 0,
+                        timeInBed: 0,
+                        sleepStart: nil,
+                        sleepEnd: nil,
+                        restorativeSleepDuration: 0,
+                        remSleepDuration: 0,
+                        deepSleepDuration: 0,
+                        coreSleepDuration: 0,
+                        awakeDuration: 0
+                    ))
+                    return
+                }
+                
+                // Calculate time in bed (from first to last sample)
+                let firstSample = sleepSamples.min(by: { $0.startDate < $1.startDate })!
+                let lastSample = sleepSamples.max(by: { $0.endDate < $1.endDate })!
+                let timeInBed = lastSample.endDate.timeIntervalSince(firstSample.startDate)
+                
+                // Calculate sleep durations by stage
+                var totalSleep: TimeInterval = 0
+                var remSleep: TimeInterval = 0
+                var deepSleep: TimeInterval = 0
+                var coreSleep: TimeInterval = 0
+                var awakeDuration: TimeInterval = 0
+                
+                for sample in sleepSamples {
+                    let duration = sample.endDate.timeIntervalSince(sample.startDate)
+                    
+                    switch sample.value {
+                    case HKCategoryValueSleepAnalysis.asleepREM.rawValue:
+                        remSleep += duration
+                        totalSleep += duration
+                        
+                    case HKCategoryValueSleepAnalysis.asleepDeep.rawValue:
+                        deepSleep += duration
+                        totalSleep += duration
+                        
+                    case HKCategoryValueSleepAnalysis.asleepCore.rawValue:
+                        coreSleep += duration
+                        totalSleep += duration
+                        
+                    case HKCategoryValueSleepAnalysis.asleepUnspecified.rawValue:
+                        totalSleep += duration
+                        
+                    case HKCategoryValueSleepAnalysis.awake.rawValue:
+                        awakeDuration += duration
+                        
+                    default:
+                        break
+                    }
+                }
+                
+                // Restorative sleep = REM + Deep sleep
+                let restorativeSleep = remSleep + deepSleep
+                
+                let sleepData = SleepData(
+                    totalSleepDuration: totalSleep,
+                    timeInBed: timeInBed,
+                    sleepStart: firstSample.startDate,
+                    sleepEnd: lastSample.endDate,
+                    restorativeSleepDuration: restorativeSleep,
+                    remSleepDuration: remSleep,
+                    deepSleepDuration: deepSleep,
+                    coreSleepDuration: coreSleep,
+                    awakeDuration: awakeDuration
+                )
+                
+                continuation.resume(returning: sleepData)
+            }
+            
+            healthStore.execute(query)
+        }
+    }
+
+    /// Fetch last night's detailed sleep data
+    func fetchLastNightDetailedSleep() async throws -> SleepData {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
+        let yesterdayEvening = calendar.date(byAdding: .hour, value: -12, to: startOfToday)!
+        
+        return try await fetchDetailedSleepData(from: yesterdayEvening, to: now)
+    }
+
+    // MARK: - Sleep Data Model
+
+    struct SleepData {
+        let totalSleepDuration: TimeInterval // Actual sleep time
+        let timeInBed: TimeInterval // From first to last sample
+        let sleepStart: Date?
+        let sleepEnd: Date?
+        let restorativeSleepDuration: TimeInterval // REM + Deep
+        let remSleepDuration: TimeInterval
+        let deepSleepDuration: TimeInterval
+        let coreSleepDuration: TimeInterval
+        let awakeDuration: TimeInterval
+        
+        // Calculated properties
+        var sleepEfficiency: Double {
+            guard timeInBed > 0 else { return 0 }
+            return (totalSleepDuration / timeInBed) * 100
+        }
+        
+        var restorativeSleepPercentage: Double {
+            guard totalSleepDuration > 0 else { return 0 }
+            return (restorativeSleepDuration / totalSleepDuration) * 100
         }
     }
     

@@ -237,19 +237,5 @@ extension HealthMetric {
     }
 }
 
-// MARK: - Preview
-struct MetricCardView_Previews: PreviewProvider {
-    static var previews: some View {
-        ZStack {
-            Color.appBackground.ignoresSafeArea()
-            
-            VStack(spacing: 12) {
-                MetricCardView(metric: .respiratoryRate(value: 14.0, baseline: 14.3))
-                MetricCardView(metric: .sleepEfficiency(value: 76, baseline: 86))
-                MetricCardView(metric: .vo2Max(value: 60, baseline: 60))
-            }
-            .padding()
-        }
-    }
-}
+
 

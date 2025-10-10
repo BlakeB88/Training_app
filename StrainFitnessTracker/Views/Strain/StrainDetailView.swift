@@ -9,10 +9,16 @@ import SwiftUI
 import UIKit
 
 struct StrainDetailView: View {
-    @StateObject private var viewModel = StrainViewModel()
-    @State private var selectedDate = Date()
+    @StateObject private var viewModel: StrainViewModel
+    @State private var selectedDate: Date
     @State private var isDateSelectorExpanded = false
     @Environment(\.colorScheme) var colorScheme
+    
+    init(initialDate: Date = Date()) {
+        let vm = StrainViewModel(selectedDate: initialDate)
+        _viewModel = StateObject(wrappedValue: vm)
+        _selectedDate = State(initialValue: initialDate)
+    }
     
     var body: some View {
         ScrollView {

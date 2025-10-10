@@ -147,7 +147,7 @@ struct DashboardView: View {
                     .fill(Color.warningOrange)
                     .frame(width: 36, height: 36)
                 
-                Text("HG")
+                Text("BB")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
             }
@@ -209,7 +209,6 @@ struct DashboardView: View {
                     .foregroundColor(.secondaryText)
             }
         }
-        .padding(.top, 8)
     }
     
     // MARK: - Primary Metrics Section
@@ -229,19 +228,25 @@ struct DashboardView: View {
                     color: .sleepBlue
                 )
                 
-                CircularProgressView(
-                    title: "Recovery",
-                    value: viewModel.metrics.recoveryScore,
-                    color: .recoveryGreen
-                )
+                NavigationLink(destination: RecoveryDetailView(initialDate: selectedDate)) {
+                    CircularProgressView(
+                        title: "Recovery",
+                        value: viewModel.metrics.recoveryScore,
+                        color: .recoveryGreen,
+                        isInteractive: true
+                    )
+                }
                 
-                CircularProgressView(
-                    title: "Strain",
-                    value: viewModel.metrics.strainScore,
-                    maxValue: 21,
-                    color: .strainBlue,
-                    showPercentage: false
-                )
+                NavigationLink(destination: StrainDetailView(initialDate: selectedDate)) {
+                    CircularProgressView(
+                        title: "Strain",
+                        value: viewModel.metrics.strainScore,
+                        maxValue: 21,
+                        color: .strainBlue,
+                        showPercentage: false,
+                        isInteractive: true
+                    )
+                }
             }
         }
         .padding(.vertical, 20)

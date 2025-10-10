@@ -14,7 +14,7 @@ import HealthKit
 class StrainViewModel: ObservableObject {
     
     // MARK: - Published Properties
-    @Published var selectedDate: Date = Date()
+    @Published var selectedDate: Date
     @Published var dailyMetrics: SimpleDailyMetrics?
     @Published var weeklyMetrics: [SimpleDailyMetrics] = []
     @Published var monthlyMetrics: [SimpleDailyMetrics] = []
@@ -67,8 +67,9 @@ class StrainViewModel: ObservableObject {
     private let repository: MetricsRepository
     
     // MARK: - Initialization
-    init(repository: MetricsRepository? = nil) {
+    init(repository: MetricsRepository? = nil, selectedDate: Date = Date()) {
         self.repository = repository ?? MetricsRepository()
+        self.selectedDate = selectedDate
     }
     
     // MARK: - Public Methods

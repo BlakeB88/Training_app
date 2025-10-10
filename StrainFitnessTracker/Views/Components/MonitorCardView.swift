@@ -159,21 +159,4 @@ struct DailyOutlookCard: View {
     }
 }
 
-// MARK: - Preview
-struct MonitorCardView_Previews: PreviewProvider {
-    static var previews: some View {
-        ZStack {
-            Color.appBackground.ignoresSafeArea()
-            
-            VStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    HealthMonitorCard(metricsInRange: 5, totalMetrics: 5)
-                    StressMonitorCard(currentStress: 1.4, lastUpdateTime: "11:36 AM")
-                }
-                
-                DailyOutlookCard()
-            }
-            .padding()
-        }
-    }
-}
+

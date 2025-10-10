@@ -77,38 +77,3 @@ struct ActivityCardView: View {
         }
     }
 }
-
-// MARK: - Preview
-struct ActivityCardView_Previews: PreviewProvider {
-    static var previews: some View {
-        ZStack {
-            Color.appBackground.ignoresSafeArea()
-            
-            VStack(spacing: 12) {
-                let now = Date()
-                let calendar = Calendar.current
-                
-                ActivityCardView(
-                    activity: Activity(
-                        type: .sleep,
-                        startTime: calendar.date(byAdding: .hour, value: -11, to: now)!,
-                        endTime: calendar.date(byAdding: .hour, value: -2, to: now)!,
-                        strain: nil,
-                        duration: 9 * 3600 + 30 * 60
-                    )
-                )
-                
-                ActivityCardView(
-                    activity: Activity(
-                        type: .swimming,
-                        startTime: calendar.date(byAdding: .hour, value: -1, to: now)!,
-                        endTime: now,
-                        strain: 10.1,
-                        duration: 3600 + 16 * 60
-                    )
-                )
-            }
-            .padding()
-        }
-    }
-}
