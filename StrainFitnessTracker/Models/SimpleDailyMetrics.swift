@@ -2,7 +2,7 @@
 //  SimpleDailyMetrics.swift
 //  StrainFitnessTracker
 //
-//  Updated to include new health metrics
+//  Updated to include stress monitoring data
 //
 
 import Foundation
@@ -24,23 +24,31 @@ struct SimpleDailyMetrics: Identifiable, Codable {
     var sleepDuration: Double? // in hours
     var sleepStart: Date?
     var sleepEnd: Date?
-    var timeInBed: Double? // NEW - in hours
-    var sleepEfficiency: Double? // NEW - percentage (0-100)
-    var restorativeSleepPercentage: Double? // NEW - percentage (0-100)
-    var restorativeSleepDuration: Double? // NEW - in hours
-    var sleepDebt: Double? // NEW - in hours
-    var sleepConsistency: Double? // NEW - percentage (0-100)
+    var timeInBed: Double? // in hours
+    var sleepEfficiency: Double? // percentage (0-100)
+    var restorativeSleepPercentage: Double? // percentage (0-100)
+    var restorativeSleepDuration: Double? // in hours
+    var sleepDebt: Double? // in hours
+    var sleepConsistency: Double? // percentage (0-100)
     
     // Physiological Metrics
     var hrvAverage: Double?
     var restingHeartRate: Double?
-    var respiratoryRate: Double? // NEW
-    var vo2Max: Double? // NEW
+    var respiratoryRate: Double?
+    var vo2Max: Double?
     
     // Activity Metrics
-    var steps: Int? // NEW
-    var activeCalories: Double? // NEW
-    var averageHeartRate: Double? // NEW
+    var steps: Int?
+    var activeCalories: Double?
+    var averageHeartRate: Double?
+    
+    // NEW: Stress Metrics
+    var averageStress: Double? // 0-3 scale
+    var maxStress: Double? // 0-3 scale
+    var stressReadings: [StressReading]? // Individual readings throughout the day
+    var timeInHighStress: Double? // in hours
+    var timeInMediumStress: Double? // in hours
+    var timeInLowStress: Double? // in hours
     
     // Baseline
     var baselineMetrics: BaselineMetrics?
@@ -72,6 +80,12 @@ struct SimpleDailyMetrics: Identifiable, Codable {
         steps: Int? = nil,
         activeCalories: Double? = nil,
         averageHeartRate: Double? = nil,
+        averageStress: Double? = nil,
+        maxStress: Double? = nil,
+        stressReadings: [StressReading]? = nil,
+        timeInHighStress: Double? = nil,
+        timeInMediumStress: Double? = nil,
+        timeInLowStress: Double? = nil,
         baselineMetrics: BaselineMetrics? = nil,
         lastUpdated: Date = Date()
     ) {
@@ -97,6 +111,12 @@ struct SimpleDailyMetrics: Identifiable, Codable {
         self.steps = steps
         self.activeCalories = activeCalories
         self.averageHeartRate = averageHeartRate
+        self.averageStress = averageStress
+        self.maxStress = maxStress
+        self.stressReadings = stressReadings
+        self.timeInHighStress = timeInHighStress
+        self.timeInMediumStress = timeInMediumStress
+        self.timeInLowStress = timeInLowStress
         self.baselineMetrics = baselineMetrics
         self.lastUpdated = lastUpdated
     }
@@ -128,6 +148,12 @@ struct SimpleDailyMetrics: Identifiable, Codable {
             steps: self.steps,
             activeCalories: self.activeCalories,
             averageHeartRate: self.averageHeartRate,
+            averageStress: self.averageStress,
+            maxStress: self.maxStress,
+            stressReadings: self.stressReadings,
+            timeInHighStress: self.timeInHighStress,
+            timeInMediumStress: self.timeInMediumStress,
+            timeInLowStress: self.timeInLowStress,
             baselineMetrics: self.baselineMetrics,
             lastUpdated: Date()
         )
@@ -158,9 +184,95 @@ struct SimpleDailyMetrics: Identifiable, Codable {
             steps: self.steps,
             activeCalories: self.activeCalories,
             averageHeartRate: self.averageHeartRate,
+            averageStress: self.averageStress,
+            maxStress: self.maxStress,
+            stressReadings: self.stressReadings,
+            timeInHighStress: self.timeInHighStress,
+            timeInMediumStress: self.timeInMediumStress,
+            timeInLowStress: self.timeInLowStress,
             baselineMetrics: self.baselineMetrics,
             lastUpdated: Date()
         )
+    }
+    
+    /// Update with new stress data
+    func withUpdatedStress(
+        average: Double,
+        max: Double,
+        readings: [StressReading],
+        timeInHigh: Double,
+        timeInMedium: Double,
+        timeInLow: Double
+    ) -> SimpleDailyMetrics {
+        return SimpleDailyMetrics(
+            id: self.id,
+            date: self.date,
+            strain: self.strain,
+            recovery: self.recovery,
+            recoveryComponents: self.recoveryComponents,
+            workouts: self.workouts,
+            sleepDuration: self.sleepDuration,
+            sleepStart: self.sleepStart,
+            sleepEnd: self.sleepEnd,
+            timeInBed: self.timeInBed,
+            sleepEfficiency: self.sleepEfficiency,
+            restorativeSleepPercentage: self.restorativeSleepPercentage,
+            restorativeSleepDuration: self.restorativeSleepDuration,
+            sleepDebt: self.sleepDebt,
+            sleepConsistency: self.sleepConsistency,
+            hrvAverage: self.hrvAverage,
+            restingHeartRate: self.restingHeartRate,
+            respiratoryRate: self.respiratoryRate,
+            vo2Max: self.vo2Max,
+            steps: self.steps,
+            activeCalories: self.activeCalories,
+            averageHeartRate: self.averageHeartRate,
+            averageStress: average,
+            maxStress: max,
+            stressReadings: readings,
+            timeInHighStress: timeInHigh,
+            timeInMediumStress: timeInMedium,
+            timeInLowStress: timeInLow,
+            baselineMetrics: self.baselineMetrics,
+            lastUpdated: Date()
+        )
+    }
+}
+
+// MARK: - StressReading Model (Simplified for Persistence)
+
+/// Lightweight stress reading for persistence in SimpleDailyMetrics
+struct StressReading: Codable, Equatable, Identifiable {
+    let id: UUID
+    let timestamp: Date
+    let stressLevel: Double // 0-3 scale
+    let heartRate: Double
+    let isExerciseRelated: Bool
+    
+    init(id: UUID = UUID(), timestamp: Date, stressLevel: Double, heartRate: Double, isExerciseRelated: Bool = false) {
+        self.id = id
+        self.timestamp = timestamp
+        self.stressLevel = min(max(stressLevel, 0.0), 3.0) // Clamp to 0-3
+        self.heartRate = heartRate
+        self.isExerciseRelated = isExerciseRelated
+    }
+    
+    /// Convert from full StressMetrics
+    init(from metrics: StressMetrics) {
+        self.id = metrics.id
+        self.timestamp = metrics.timestamp
+        self.stressLevel = metrics.stressLevel
+        self.heartRate = metrics.heartRate
+        self.isExerciseRelated = metrics.isExerciseRelated
+    }
+    
+    var stressZone: StressZone {
+        switch stressLevel {
+        case 0.0..<1.0: return .low
+        case 1.0..<2.0: return .medium
+        case 2.0...3.0: return .high
+        default: return .medium
+        }
     }
 }
 

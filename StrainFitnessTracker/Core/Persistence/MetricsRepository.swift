@@ -3,8 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
-//  Updated: 10/9/25 - Updated to use SimpleDailyMetrics
-//  Fixed: 10/10/25 - Added missing property save/load operations
+//  Updated: 10/10/25 - Added stress metrics support
 //
 
 import Foundation
@@ -41,7 +40,7 @@ class MetricsRepository {
             entity.date = metrics.date.startOfDay
         }
         
-        // Update EXISTING properties
+        // Update existing properties
         entity.strain = metrics.strain
         entity.recovery = metrics.recovery ?? 0
         entity.sleepDuration = metrics.sleepDuration ?? 0
@@ -51,7 +50,7 @@ class MetricsRepository {
         entity.restingHeartRate = metrics.restingHeartRate ?? 0
         entity.lastUpdated = metrics.lastUpdated
         
-        // ✅ FIXED: Save NEW properties
+        // Save new health metrics
         entity.timeInBed = metrics.timeInBed ?? 0
         entity.sleepEfficiency = metrics.sleepEfficiency ?? 0
         entity.restorativeSleepPercentage = metrics.restorativeSleepPercentage ?? 0
@@ -62,6 +61,20 @@ class MetricsRepository {
         entity.steps = Int32(metrics.steps ?? 0)
         entity.activeCalories = metrics.activeCalories ?? 0
         entity.averageHeartRate = metrics.averageHeartRate ?? 0
+        
+        // ✨ NEW: Save stress metrics
+        entity.averageStress = metrics.averageStress ?? 0
+        entity.maxStress = metrics.maxStress ?? 0
+        entity.timeInHighStress = metrics.timeInHighStress ?? 0
+        entity.timeInMediumStress = metrics.timeInMediumStress ?? 0
+        entity.timeInLowStress = metrics.timeInLowStress ?? 0
+        
+        // ✨ NEW: Save stress readings as JSON
+        if let readings = metrics.stressReadings {
+            entity.stressReadingsData = try? JSONEncoder().encode(readings)
+        } else {
+            entity.stressReadingsData = nil
+        }
         
         // Delete existing workouts and recreate
         if let existingWorkouts = entity.workouts as? Set<WorkoutRecordEntity> {
@@ -180,6 +193,40 @@ class MetricsRepository {
         return workouts.filter { $0.workoutType == type }
     }
     
+    // MARK: - ✨ NEW: Stress Operations
+    
+    /// Fetch stress data for a specific date
+    func fetchStressData(for date: Date) throws -> (average: Double?, max: Double?, readings: [StressReading]?) {
+        guard let metrics = try fetchDailyMetrics(for: date) else {
+            return (nil, nil, nil)
+        }
+        return (metrics.averageStress, metrics.maxStress, metrics.stressReadings)
+    }
+    
+    /// Fetch stress data for a date range
+    func fetchStressData(from startDate: Date, to endDate: Date) throws -> [(date: Date, average: Double, max: Double)] {
+        let metrics = try fetchDailyMetrics(from: startDate, to: endDate)
+        return metrics.compactMap { metric in
+            guard let avg = metric.averageStress, let max = metric.maxStress else { return nil }
+            return (metric.date, avg, max)
+        }
+    }
+    
+    /// Calculate average stress over a period
+    func calculateAverageStress(from startDate: Date, to endDate: Date) throws -> Double? {
+        let stressData = try fetchStressData(from: startDate, to: endDate)
+        guard !stressData.isEmpty else { return nil }
+        
+        let totalStress = stressData.reduce(0.0) { $0 + $1.average }
+        return totalStress / Double(stressData.count)
+    }
+    
+    /// Get days with high stress (avg >= 2.0)
+    func getHighStressDays(from startDate: Date, to endDate: Date) throws -> [Date] {
+        let stressData = try fetchStressData(from: startDate, to: endDate)
+        return stressData.filter { $0.average >= 2.0 }.map { $0.date }
+    }
+    
     // MARK: - Statistics Operations
     
     /// Calculate average strain over a period
@@ -255,8 +302,25 @@ class MetricsRepository {
             sleepDuration: metrics.sleepDuration,
             sleepStart: metrics.sleepStart,
             sleepEnd: metrics.sleepEnd,
+            timeInBed: metrics.timeInBed,
+            sleepEfficiency: metrics.sleepEfficiency,
+            restorativeSleepPercentage: metrics.restorativeSleepPercentage,
+            restorativeSleepDuration: metrics.restorativeSleepDuration,
+            sleepDebt: metrics.sleepDebt,
+            sleepConsistency: metrics.sleepConsistency,
             hrvAverage: metrics.hrvAverage,
             restingHeartRate: metrics.restingHeartRate,
+            respiratoryRate: metrics.respiratoryRate,
+            vo2Max: metrics.vo2Max,
+            steps: metrics.steps,
+            activeCalories: metrics.activeCalories,
+            averageHeartRate: metrics.averageHeartRate,
+            averageStress: metrics.averageStress,
+            maxStress: metrics.maxStress,
+            stressReadings: metrics.stressReadings,
+            timeInHighStress: metrics.timeInHighStress,
+            timeInMediumStress: metrics.timeInMediumStress,
+            timeInLowStress: metrics.timeInLowStress,
             baselineMetrics: metrics.baselineMetrics,
             lastUpdated: Date()
         )
@@ -286,41 +350,51 @@ class MetricsRepository {
         let workouts = workoutEntities.compactMap { convertToWorkoutSummary($0) }
             .sorted { $0.startDate < $1.startDate }
         
+        // ✨ NEW: Decode stress readings
+        var stressReadings: [StressReading]?
+        if let data = entity.stressReadingsData {
+            stressReadings = try? JSONDecoder().decode([StressReading].self, from: data)
+        }
+        
         return SimpleDailyMetrics(
             id: id,
             date: date,
             strain: entity.strain,
             recovery: entity.recovery > 0 ? entity.recovery : nil,
-            recoveryComponents: nil, // Not stored in Core Data
+            recoveryComponents: nil,
             workouts: workouts,
             
             // Sleep metrics
             sleepDuration: entity.sleepDuration > 0 ? entity.sleepDuration : nil,
             sleepStart: entity.sleepStart,
             sleepEnd: entity.sleepEnd,
-            
-            // ✅ FIXED: Load NEW sleep metrics
             timeInBed: entity.timeInBed > 0 ? entity.timeInBed : nil,
             sleepEfficiency: entity.sleepEfficiency > 0 ? entity.sleepEfficiency : nil,
             restorativeSleepPercentage: entity.restorativeSleepPercentage > 0 ? entity.restorativeSleepPercentage : nil,
-            restorativeSleepDuration: nil, // Calculated, not stored separately
+            restorativeSleepDuration: nil,
             sleepDebt: entity.sleepDebt > 0 ? entity.sleepDebt : nil,
             sleepConsistency: entity.sleepConsistency > 0 ? entity.sleepConsistency : nil,
             
             // Physiological metrics
             hrvAverage: entity.hrvAverage > 0 ? entity.hrvAverage : nil,
             restingHeartRate: entity.restingHeartRate > 0 ? entity.restingHeartRate : nil,
-            
-            // ✅ FIXED: Load NEW physiological metrics
             respiratoryRate: entity.respiratoryRate > 0 ? entity.respiratoryRate : nil,
             vo2Max: entity.vo2Max > 0 ? entity.vo2Max : nil,
             
-            // ✅ FIXED: Load NEW activity metrics
+            // Activity metrics
             steps: entity.steps > 0 ? Int(entity.steps) : nil,
             activeCalories: entity.activeCalories > 0 ? entity.activeCalories : nil,
             averageHeartRate: entity.averageHeartRate > 0 ? entity.averageHeartRate : nil,
             
-            baselineMetrics: nil, // Not stored in Core Data
+            // ✨ NEW: Stress metrics
+            averageStress: entity.averageStress > 0 ? entity.averageStress : nil,
+            maxStress: entity.maxStress > 0 ? entity.maxStress : nil,
+            stressReadings: stressReadings,
+            timeInHighStress: entity.timeInHighStress > 0 ? entity.timeInHighStress : nil,
+            timeInMediumStress: entity.timeInMediumStress > 0 ? entity.timeInMediumStress : nil,
+            timeInLowStress: entity.timeInLowStress > 0 ? entity.timeInLowStress : nil,
+            
+            baselineMetrics: nil,
             lastUpdated: entity.lastUpdated ?? Date()
         )
     }
