@@ -188,17 +188,36 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Private Methods
     
     private func loadFromRepository(for date: Date = Date()) async {
+        print("📂 Loading from repository for \(date.formatted())...")
+        
         // Load today's metrics
         guard let simpleDailyMetrics = try? repository.fetchDailyMetrics(for: date) else {
             // No data yet - this is normal for first launch
-            print("ℹ️ No data in repository for \(date.formatted())")
+            print("⚠️ No data in repository for \(date.formatted())")
             // Keep showing sample data
             return
         }
         
+        print("✅ Found metrics in repository:")
+        print("  Date: \(simpleDailyMetrics.date.formatted())")
+        print("  Sleep Duration: \(simpleDailyMetrics.sleepDuration ?? 0) hours")
+        print("  Time in Bed: \(simpleDailyMetrics.timeInBed ?? 0) hours")
+        print("  Sleep Efficiency: \(simpleDailyMetrics.sleepEfficiency ?? 0)%")
+        print("  Restorative Sleep %: \(simpleDailyMetrics.restorativeSleepPercentage ?? 0)%")
+        print("  Sleep Consistency: \(simpleDailyMetrics.sleepConsistency ?? 0)%")
+        print("  Sleep Debt: \(simpleDailyMetrics.sleepDebt ?? 0) hours")
+        print("  Steps: \(simpleDailyMetrics.steps ?? 0)")
+        print("  Calories: \(simpleDailyMetrics.activeCalories ?? 0)")
+        print("  VO2 Max: \(simpleDailyMetrics.vo2Max ?? 0)")
+        print("  Avg Heart Rate: \(simpleDailyMetrics.averageHeartRate ?? 0)")
+        print("  Respiratory Rate: \(simpleDailyMetrics.respiratoryRate ?? 0)")
+        print("  Strain: \(simpleDailyMetrics.strain)")
+        print("  Recovery: \(simpleDailyMetrics.recovery ?? 0)")
+        
         // Load week data
         let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: date)!
         let weekMetrics = (try? repository.fetchDailyMetrics(from: weekStart, to: date)) ?? []
+        print("  📊 Loaded \(weekMetrics.count) days of week data")
         
         // Convert to UI models
         let uiMetrics = convertToUIMetrics(simpleDailyMetrics)
@@ -209,7 +228,10 @@ class DashboardViewModel: ObservableObject {
         self.weekData = uiWeekData
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
         
-        print("✅ Dashboard loaded with real data")
+        print("✅ Dashboard UI updated with real data")
+        print("  UI Sleep Duration: \(self.metrics.sleepDuration / 3600) hours")
+        print("  UI Steps: \(self.metrics.steps)")
+        print("  UI Calories: \(self.metrics.calories)")
     }
     
     private func setupObservers() {
@@ -252,8 +274,22 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Conversion Methods
     
     private func convertToUIMetrics(_ simple: SimpleDailyMetrics) -> DailyMetrics {
+        print("🔄 Converting SimpleDailyMetrics to DailyMetrics...")
+        print("  📊 Sleep Duration: \(simple.sleepDuration ?? 0) hours")
+        print("  📊 Time in Bed: \(simple.timeInBed ?? 0) hours")
+        print("  📊 Sleep Efficiency: \(simple.sleepEfficiency ?? 0)%")
+        print("  📊 Restorative Sleep: \(simple.restorativeSleepPercentage ?? 0)%")
+        print("  📊 Sleep Consistency: \(simple.sleepConsistency ?? 0)%")
+        print("  📊 Sleep Debt: \(simple.sleepDebt ?? 0) hours")
+        print("  📊 Steps: \(simple.steps ?? 0)")
+        print("  📊 Calories: \(simple.activeCalories ?? 0)")
+        print("  📊 VO2 Max: \(simple.vo2Max ?? 0)")
+        print("  📊 Avg HR: \(simple.averageHeartRate ?? 0)")
+        print("  📊 Respiratory Rate: \(simple.respiratoryRate ?? 0)")
+        
         // Calculate sleep score (0-100 based on duration and quality)
         let sleepScore = calculateSleepScore(simple)
+        print("  💤 Calculated Sleep Score: \(sleepScore)")
         
         // Convert workouts to activities
         let activities = convertWorkoutsToActivities(simple.workouts)
@@ -269,9 +305,10 @@ class DashboardViewModel: ObservableObject {
                 duration: sleepDuration * 3600
             )
             allActivities.insert(sleepActivity, at: 0)
+            print("  😴 Added sleep activity: \(sleepDuration) hours")
         }
         
-        return DailyMetrics(
+        let metrics = DailyMetrics(
             date: simple.date,
             sleepScore: sleepScore,
             recoveryScore: simple.recovery ?? 0,
@@ -304,6 +341,10 @@ class DashboardViewModel: ObservableObject {
             healthMetricsInRange: calculateMetricsInRange(simple),
             totalHealthMetrics: 5
         )
+        
+        print("✅ Conversion complete. Sleep duration in metrics: \(metrics.sleepDuration / 3600) hours")
+        
+        return metrics
     }
 
     /// Improved sleep score calculation using multiple factors
