@@ -43,7 +43,7 @@ class DataSyncService: ObservableObject {
     }
     
     // MARK: - Sync Methods
-    
+
     /// Quick sync - only today's data
     func quickSync() async {
         guard !isSyncing else {
@@ -58,7 +58,10 @@ class DataSyncService: ObservableObject {
         do {
             let today = Date().startOfDay
             print("📅 Syncing: \(today.formatted(.dateTime.month().day().year()))")
-            try await syncDay(today)
+            
+            // Use the enhanced fetch method
+            let metrics = try await fetchEnhancedDailyMetrics(for: today)
+            try repository.saveDailyMetrics(metrics)
             
             updateLastSyncDate()
             print("✅ Quick sync completed successfully")
@@ -69,11 +72,15 @@ class DataSyncService: ObservableObject {
         
         isSyncing = false
     }
-    
-    /// Full sync - last 7 days
+
+    /// Full sync - last N days
     func fullSync(days: Int = 7) async {
-        guard !isSyncing else { return }
+        guard !isSyncing else {
+            print("⚠️ Already syncing, skipping fullSync")
+            return
+        }
         
+        print("🔄 Starting full sync for last \(days) days...")
         isSyncing = true
         syncError = nil
         
@@ -83,224 +90,273 @@ class DataSyncService: ObservableObject {
             
             var currentDate = startDate
             while currentDate <= endDate {
-                try await syncDay(currentDate)
+                print("📅 Syncing: \(currentDate.formatted(.dateTime.month().day()))")
+                
+                // Use the enhanced fetch method
+                let metrics = try await fetchEnhancedDailyMetrics(for: currentDate)
+                try repository.saveDailyMetrics(metrics)
+                
                 currentDate = Calendar.current.date(byAdding: .day, value: 1, to: currentDate)!
             }
             
             updateLastSyncDate()
+            print("✅ Full sync completed successfully")
         } catch {
             syncError = error
-            print("Full sync error: \(error)")
+            print("❌ Full sync error: \(error.localizedDescription)")
         }
         
         isSyncing = false
     }
-    
+
     /// Sync specific date
     func syncDate(_ date: Date) async {
-            guard !isSyncing else { return }
+        guard !isSyncing else { return }
+        
+        isSyncing = true
+        syncError = nil
+        
+        do {
+            print("🔄 Syncing data for \(date.formatted())...")
             
-            isSyncing = true
-            syncError = nil
+            // Use the enhanced fetch method
+            let metrics = try await fetchEnhancedDailyMetrics(for: date)
             
-            do {
-                print("🔄 Syncing data for \(date.formatted())...")
-                
-                // REPLACE YOUR OLD FETCH WITH THIS NEW ONE:
-                let metrics = try await fetchEnhancedDailyMetrics(for: date)
-                
-                // Save to repository
-                try repository.saveDailyMetrics(metrics)
-                
-                lastSyncDate = Date()
-                print("✅ Sync completed successfully")
-                
-            } catch {
-                print("❌ Sync failed: \(error)")
-                syncError = error
-            }
+            // Save to repository
+            try repository.saveDailyMetrics(metrics)
             
-            isSyncing = false
+            lastSyncDate = Date()
+            print("✅ Sync completed successfully")
+            
+        } catch {
+            print("❌ Sync failed: \(error)")
+            syncError = error
         }
         
-        // MARK: - NEW: Enhanced Metrics Fetching
+        isSyncing = false
+    }
         
-        /// Fetch all daily metrics including new health data
-        private func fetchEnhancedDailyMetrics(for date: Date) async throws -> SimpleDailyMetrics {
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+    // MARK: - NEW: Enhanced Metrics Fetching
+
+    /// Fetch all daily metrics including new health data
+    private func fetchEnhancedDailyMetrics(for date: Date) async throws -> SimpleDailyMetrics {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        
+        print("📊 Fetching enhanced metrics for \(date.formatted())...")
+        
+        // 1. Get existing metrics or create new
+        var metrics = (try? repository.fetchDailyMetrics(for: date)) ?? SimpleDailyMetrics(date: date)
+        
+        // 2. Fetch workouts and calculate strain
+        print("  🏋️ Fetching workouts...")
+        let hkWorkouts = try await healthKitManager.fetchWorkouts(from: startOfDay, to: endOfDay)
+        
+        // Get heart rate profile for strain calculation
+        let restingHR = try await healthKitManager.fetchRestingHeartRate() ?? 60.0
+        let maxHR = 220.0 - 30.0 // TODO: Get from user profile
+        let hrProfile = HeartRateProfile(
+            maxHeartRate: maxHR,
+            restingHeartRate: restingHR,
+            age: 30 // TODO: Get from user profile
+        )
+        
+        // Calculate daily strain using your existing method
+        let strain = await StrainCalculator.calculateDailyStrain(
+            workouts: hkWorkouts,
+            hrProfile: hrProfile
+        )
+        
+        // Create workout summaries
+        var workoutSummaries: [WorkoutSummary] = []
+        for hkWorkout in hkWorkouts {
+            let summary = try await createWorkoutSummary(hkWorkout, hrProfile: hrProfile)
+            workoutSummaries.append(summary)
+        }
+        
+        // 3. Fetch ENHANCED sleep data (from previous night)
+        print("  😴 Fetching detailed sleep data...")
+        let sleepStart = calendar.date(byAdding: .hour, value: -12, to: startOfDay)!
+        let sleepData = try await healthKitManager.fetchDetailedSleepData(from: sleepStart, to: endOfDay)
+        
+        // 4. Fetch physiological metrics
+        print("  ❤️ Fetching physiological metrics...")
+        async let hrvTask = healthKitManager.fetchLatestHRV()
+        async let rhrTask = healthKitManager.fetchRestingHeartRate()
+        async let respRateTask = healthKitManager.fetchRespiratoryRate()
+        async let vo2MaxTask = healthKitManager.fetchLatestVO2Max()
+        
+        let (hrv, rhr, respiratoryRate, vo2Max) = try await (hrvTask, rhrTask, respRateTask, vo2MaxTask)
+        
+        // 5. Fetch NEW activity metrics
+        print("  🚶 Fetching activity metrics...")
+        async let stepsTask = healthKitManager.fetchStepCount(from: startOfDay, to: endOfDay)
+        async let avgHRTask = calculateAverageHeartRate(for: date)
+        
+        let (steps, averageHR) = try await (stepsTask, avgHRTask)
+        
+        // 6. Calculate NEW sleep metrics
+        print("  📊 Calculating sleep metrics...")
+        let sleepDebt = try await calculateSleepDebt(for: date, currentSleep: sleepData.totalSleepDuration / 3600)
+        let sleepConsistency = try await calculateSleepConsistency(for: date)
+        
+        // 7. Calculate recovery using your existing RecoveryCalculator
+        var recovery: Double?
+        var recoveryComponents: RecoveryComponents?
+        var baselineMetrics: BaselineMetrics?
+        
+        let historicalMetrics = try repository.fetchRecentDailyMetrics(days: 28)
+        if !historicalMetrics.isEmpty {
+            baselineMetrics = calculateBaselinesFromSimpleMetrics(historicalMetrics, forDate: date)
             
-            print("📊 Fetching enhanced metrics for \(date.formatted())...")
-            
-            // 1. Get existing metrics or create new
-            var metrics = (try? repository.fetchDailyMetrics(for: date)) ?? SimpleDailyMetrics(date: date)
-            
-            // 2. Fetch workouts and calculate strain
-            print("  🏋️ Fetching workouts...")
-            let workouts = try await healthKitManager.fetchWorkouts(from: startOfDay, to: endOfDay)
-            let workoutSummaries = try await processWorkouts(workouts)
-            let strain = StrainCalculator.calculateDailyStrain(from: workoutSummaries)
-            
-            // 3. Fetch ENHANCED sleep data (from previous night)
-            print("  😴 Fetching detailed sleep data...")
-            let sleepStart = calendar.date(byAdding: .hour, value: -12, to: startOfDay)!
-            let sleepData = try await healthKitManager.fetchDetailedSleepData(from: sleepStart, to: endOfDay)
-            
-            // 4. Fetch physiological metrics
-            print("  ❤️ Fetching physiological metrics...")
-            async let hrvTask = healthKitManager.fetchLatestHRV()
-            async let rhrTask = healthKitManager.fetchRestingHeartRate()
-            async let respRateTask = healthKitManager.fetchRespiratoryRate()
-            async let vo2MaxTask = healthKitManager.fetchLatestVO2Max()
-            
-            let (hrv, rhr, respiratoryRate, vo2Max) = try await (hrvTask, rhrTask, respRateTask, vo2MaxTask)
-            
-            // 5. Fetch NEW activity metrics
-            print("  🚶 Fetching activity metrics...")
-            async let stepsTask = healthKitManager.fetchStepCount(from: startOfDay, to: endOfDay)
-            async let avgHRTask = calculateAverageHeartRate(for: date)
-            
-            let (steps, averageHR) = try await (stepsTask, avgHRTask)
-            
-            // 6. Calculate NEW sleep metrics
-            print("  📊 Calculating sleep metrics...")
-            let sleepDebt = try await calculateSleepDebt(for: date, currentSleep: sleepData.totalSleepDuration / 3600)
-            let sleepConsistency = try await calculateSleepConsistency(for: date)
-            
-            // 7. Calculate recovery (if baseline exists)
-            if let baseline = metrics.baselineMetrics {
+            if let baseline = baselineMetrics {
                 print("  🔋 Calculating recovery...")
-                let recoveryResult = RecoveryCalculator.calculateRecovery(
-                    hrv: hrv,
-                    rhr: rhr,
+                recovery = RecoveryCalculator.calculateRecoveryScore(
+                    hrvCurrent: hrv,
+                    hrvBaseline: baseline.hrvBaseline,
+                    rhrCurrent: rhr,
+                    rhrBaseline: baseline.rhrBaseline,
                     sleepDuration: sleepData.totalSleepDuration / 3600,
-                    baseline: baseline
+                    respiratoryRate: respiratoryRate
                 )
-                metrics.recovery = recoveryResult.score
-                metrics.recoveryComponents = recoveryResult.components
+                
+                recoveryComponents = RecoveryCalculator.recoveryComponents(
+                    hrvCurrent: hrv,
+                    hrvBaseline: baseline.hrvBaseline,
+                    rhrCurrent: rhr,
+                    rhrBaseline: baseline.rhrBaseline,
+                    sleepDuration: sleepData.totalSleepDuration / 3600,
+                    respiratoryRate: respiratoryRate
+                )
             }
-            
-            // 8. Update all metrics
-            print("  💾 Updating metrics...")
-            
-            // Strain & Workouts
-            metrics.strain = strain
-            metrics.workouts = workoutSummaries
-            
-            // Sleep metrics (ALL NEW DATA)
-            if sleepData.totalSleepDuration > 0 {
-                metrics.sleepDuration = sleepData.totalSleepDuration / 3600
-                metrics.sleepStart = sleepData.sleepStart
-                metrics.sleepEnd = sleepData.sleepEnd
-                metrics.timeInBed = sleepData.timeInBed / 3600
-                metrics.sleepEfficiency = sleepData.sleepEfficiency
-                metrics.restorativeSleepPercentage = sleepData.restorativeSleepPercentage
-                metrics.restorativeSleepDuration = sleepData.restorativeSleepDuration / 3600
-                metrics.sleepDebt = sleepDebt
-                metrics.sleepConsistency = sleepConsistency
-            }
-            
-            // Physiological metrics
-            metrics.hrvAverage = hrv
-            metrics.restingHeartRate = rhr
-            metrics.respiratoryRate = respiratoryRate
-            metrics.vo2Max = vo2Max
-            
-            // Activity metrics (ALL NEW DATA)
-            metrics.steps = steps
-            metrics.activeCalories = workoutSummaries.reduce(0.0) { $0 + $1.calories }
-            metrics.averageHeartRate = averageHR
-            
-            metrics.lastUpdated = Date()
-            
-            print("✅ Enhanced metrics fetched successfully")
-            return metrics
         }
         
-        // MARK: - Helper Methods for New Metrics
+        // 8. Update all metrics
+        print("  💾 Updating metrics...")
         
-        /// Calculate average heart rate for the entire day
-        private func calculateAverageHeartRate(for date: Date) async throws -> Double? {
-            let calendar = Calendar.current
-            let startOfDay = calendar.startOfDay(for: date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-            
-            let heartRateData = try await healthKitManager.fetchContinuousHeartRate(from: startOfDay, to: endOfDay)
-            
-            guard !heartRateData.isEmpty else { return nil }
-            
-            let sum = heartRateData.reduce(0.0) { $0 + $1.heartRate }
-            return sum / Double(heartRateData.count)
+        // Strain & Workouts
+        metrics.strain = strain
+        metrics.workouts = workoutSummaries
+        
+        // Sleep metrics (ALL NEW DATA)
+        if sleepData.totalSleepDuration > 0 {
+            metrics.sleepDuration = sleepData.totalSleepDuration / 3600
+            metrics.sleepStart = sleepData.sleepStart
+            metrics.sleepEnd = sleepData.sleepEnd
+            metrics.timeInBed = sleepData.timeInBed / 3600
+            metrics.sleepEfficiency = sleepData.sleepEfficiency
+            metrics.restorativeSleepPercentage = sleepData.restorativeSleepPercentage
+            metrics.restorativeSleepDuration = sleepData.restorativeSleepDuration / 3600
+            metrics.sleepDebt = sleepDebt
+            metrics.sleepConsistency = sleepConsistency
         }
         
-        /// Calculate cumulative sleep debt over the last 7 days
-        private func calculateSleepDebt(for date: Date, currentSleep: Double) async throws -> Double {
-            let optimalSleep = 8.0 // 8 hours is the target
-            
-            // Get last 7 days of sleep data
-            let calendar = Calendar.current
-            let weekAgo = calendar.date(byAdding: .day, value: -7, to: date)!
-            let weekMetrics = (try? repository.fetchDailyMetrics(from: weekAgo, to: date)) ?? []
-            
-            // Calculate cumulative debt
-            var totalDebt = 0.0
-            for dayMetrics in weekMetrics {
-                if let sleep = dayMetrics.sleepDuration {
-                    let dailyDebt = max(0, optimalSleep - sleep)
-                    totalDebt += dailyDebt
-                }
+        // Physiological metrics
+        metrics.hrvAverage = hrv
+        metrics.restingHeartRate = rhr
+        metrics.respiratoryRate = respiratoryRate
+        metrics.vo2Max = vo2Max
+        
+        // Recovery
+        metrics.recovery = recovery
+        metrics.recoveryComponents = recoveryComponents
+        metrics.baselineMetrics = baselineMetrics
+        
+        // Activity metrics (ALL NEW DATA)
+        metrics.steps = steps
+        metrics.activeCalories = workoutSummaries.reduce(0.0) { $0 + $1.calories }
+        metrics.averageHeartRate = averageHR
+        
+        metrics.lastUpdated = Date()
+        
+        print("✅ Enhanced metrics fetched successfully")
+        return metrics
+    }
+
+    // MARK: - Helper Methods for New Metrics
+
+    /// Calculate average heart rate for the entire day
+    private func calculateAverageHeartRate(for date: Date) async throws -> Double? {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+        
+        let heartRateData = try await healthKitManager.fetchContinuousHeartRate(from: startOfDay, to: endOfDay)
+        
+        guard !heartRateData.isEmpty else { return nil }
+        
+        let sum = heartRateData.reduce(0.0) { $0 + $1.heartRate }
+        return sum / Double(heartRateData.count)
+    }
+
+    /// Calculate cumulative sleep debt over the last 7 days
+    private func calculateSleepDebt(for date: Date, currentSleep: Double) async throws -> Double {
+        let optimalSleep = 8.0 // 8 hours is the target
+        
+        // Get last 7 days of sleep data
+        let calendar = Calendar.current
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: date)!
+        let weekMetrics = (try? repository.fetchDailyMetrics(from: weekAgo, to: date)) ?? []
+        
+        // Calculate cumulative debt
+        var totalDebt = 0.0
+        for dayMetrics in weekMetrics {
+            if let sleep = dayMetrics.sleepDuration {
+                let dailyDebt = max(0, optimalSleep - sleep)
+                totalDebt += dailyDebt
             }
-            
-            // Add today's debt
-            let todayDebt = max(0, optimalSleep - currentSleep)
-            totalDebt += todayDebt
-            
-            return totalDebt
         }
         
-        /// Calculate sleep consistency score based on bedtime variance
-        private func calculateSleepConsistency(for date: Date) async throws -> Double {
-            let calendar = Calendar.current
-            let weekAgo = calendar.date(byAdding: .day, value: -7, to: date)!
-            let weekMetrics = (try? repository.fetchDailyMetrics(from: weekAgo, to: date)) ?? []
-            
-            // Get all sleep start times from the week
-            let sleepTimes = weekMetrics.compactMap { $0.sleepStart }
-            
-            guard sleepTimes.count >= 3 else {
-                print("  ⚠️ Not enough sleep data for consistency calculation")
-                return 0
-            }
-            
-            // Calculate average bedtime (in hours from midnight)
-            let avgTime = sleepTimes.reduce(0.0) { sum, time in
-                let hour = Double(calendar.component(.hour, from: time))
-                let minute = Double(calendar.component(.minute, from: time))
-                return sum + (hour + minute / 60.0)
-            } / Double(sleepTimes.count)
-            
-            // Calculate standard deviation
-            let variance = sleepTimes.reduce(0.0) { sum, time in
-                let hour = Double(calendar.component(.hour, from: time))
-                let minute = Double(calendar.component(.minute, from: time))
-                let timeValue = hour + minute / 60.0
-                let diff = abs(timeValue - avgTime)
-                return sum + (diff * diff)
-            } / Double(sleepTimes.count)
-            
-            let standardDeviation = sqrt(variance)
-            
-            // Convert to consistency score (0-100)
-            // Perfect consistency (0 std dev) = 100%
-            // 2 hours std dev or more = 0%
-            let maxStdDev = 2.0
-            let consistency = max(0, min(100, (1 - standardDeviation / maxStdDev) * 100))
-            
-            print("  📊 Sleep consistency: \(Int(consistency))% (stddev: \(standardDeviation.formatted(.number.precision(.fractionLength(2)))) hrs)")
-            
-            return consistency
+        // Add today's debt
+        let todayDebt = max(0, optimalSleep - currentSleep)
+        totalDebt += todayDebt
+        
+        return totalDebt
+    }
+
+    /// Calculate sleep consistency score based on bedtime variance
+    private func calculateSleepConsistency(for date: Date) async throws -> Double {
+        let calendar = Calendar.current
+        let weekAgo = calendar.date(byAdding: .day, value: -7, to: date)!
+        let weekMetrics = (try? repository.fetchDailyMetrics(from: weekAgo, to: date)) ?? []
+        
+        // Get all sleep start times from the week
+        let sleepTimes = weekMetrics.compactMap { $0.sleepStart }
+        
+        guard sleepTimes.count >= 3 else {
+            print("  ⚠️ Not enough sleep data for consistency calculation")
+            return 0
         }
+        
+        // Calculate average bedtime (in hours from midnight)
+        let avgTime = sleepTimes.reduce(0.0) { sum, time in
+            let hour = Double(calendar.component(.hour, from: time))
+            let minute = Double(calendar.component(.minute, from: time))
+            return sum + (hour + minute / 60.0)
+        } / Double(sleepTimes.count)
+        
+        // Calculate standard deviation
+        let variance = sleepTimes.reduce(0.0) { sum, time in
+            let hour = Double(calendar.component(.hour, from: time))
+            let minute = Double(calendar.component(.minute, from: time))
+            let timeValue = hour + minute / 60.0
+            let diff = abs(timeValue - avgTime)
+            return sum + (diff * diff)
+        } / Double(sleepTimes.count)
+        
+        let standardDeviation = sqrt(variance)
+        
+        // Convert to consistency score (0-100)
+        // Perfect consistency (0 std dev) = 100%
+        // 2 hours std dev or more = 0%
+        let maxStdDev = 2.0
+        let consistency = max(0, min(100, (1 - standardDeviation / maxStdDev) * 100))
+        
+        print("  📊 Sleep consistency: \(Int(consistency))% (stddev: \(standardDeviation.formatted(.number.precision(.fractionLength(2)))) hrs)")
+        
+        return consistency
+    }
     
     // MARK: - Private Sync Logic
     

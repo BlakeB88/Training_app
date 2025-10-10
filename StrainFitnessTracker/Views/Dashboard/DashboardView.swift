@@ -56,7 +56,7 @@ struct DashboardView: View {
                         .padding(.bottom, 100) // Space for tab bar
                     }
                     .refreshable {
-                        await viewModel.refreshData()
+                        await viewModel.initialize()
                     }
                 }
                 
