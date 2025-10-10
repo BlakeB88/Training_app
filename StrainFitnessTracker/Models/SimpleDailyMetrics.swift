@@ -2,7 +2,7 @@
 //  SimpleDailyMetrics.swift
 //  StrainFitnessTracker
 //
-//  Updated to include stress monitoring data
+//  Updated to include stress monitoring data and multi-night sleep tracking
 //
 
 import Foundation
@@ -31,6 +31,9 @@ struct SimpleDailyMetrics: Identifiable, Codable {
     var sleepDebt: Double? // in hours
     var sleepConsistency: Double? // percentage (0-100)
     
+    // ✅ NEW: Multi-night sleep data for enhanced recovery calculation
+    var recentSleepDurations: [Double]? // Last 3-4 nights in hours
+    
     // Physiological Metrics
     var hrvAverage: Double?
     var restingHeartRate: Double?
@@ -42,7 +45,7 @@ struct SimpleDailyMetrics: Identifiable, Codable {
     var activeCalories: Double?
     var averageHeartRate: Double?
     
-    // NEW: Stress Metrics
+    // Stress Metrics
     var averageStress: Double? // 0-3 scale
     var maxStress: Double? // 0-3 scale
     var stressReadings: [StressReading]? // Individual readings throughout the day
@@ -73,6 +76,7 @@ struct SimpleDailyMetrics: Identifiable, Codable {
         restorativeSleepDuration: Double? = nil,
         sleepDebt: Double? = nil,
         sleepConsistency: Double? = nil,
+        recentSleepDurations: [Double]? = nil,
         hrvAverage: Double? = nil,
         restingHeartRate: Double? = nil,
         respiratoryRate: Double? = nil,
@@ -104,6 +108,7 @@ struct SimpleDailyMetrics: Identifiable, Codable {
         self.restorativeSleepDuration = restorativeSleepDuration
         self.sleepDebt = sleepDebt
         self.sleepConsistency = sleepConsistency
+        self.recentSleepDurations = recentSleepDurations // ✅ NEW
         self.hrvAverage = hrvAverage
         self.restingHeartRate = restingHeartRate
         self.respiratoryRate = respiratoryRate
@@ -141,6 +146,7 @@ struct SimpleDailyMetrics: Identifiable, Codable {
             restorativeSleepDuration: self.restorativeSleepDuration,
             sleepDebt: self.sleepDebt,
             sleepConsistency: self.sleepConsistency,
+            recentSleepDurations: self.recentSleepDurations, // ✅ NEW
             hrvAverage: self.hrvAverage,
             restingHeartRate: self.restingHeartRate,
             respiratoryRate: self.respiratoryRate,
@@ -177,6 +183,7 @@ struct SimpleDailyMetrics: Identifiable, Codable {
             restorativeSleepDuration: self.restorativeSleepDuration,
             sleepDebt: self.sleepDebt,
             sleepConsistency: self.sleepConsistency,
+            recentSleepDurations: self.recentSleepDurations, // ✅ NEW
             hrvAverage: self.hrvAverage,
             restingHeartRate: self.restingHeartRate,
             respiratoryRate: self.respiratoryRate,
@@ -220,6 +227,7 @@ struct SimpleDailyMetrics: Identifiable, Codable {
             restorativeSleepDuration: self.restorativeSleepDuration,
             sleepDebt: self.sleepDebt,
             sleepConsistency: self.sleepConsistency,
+            recentSleepDurations: self.recentSleepDurations, // ✅ NEW
             hrvAverage: self.hrvAverage,
             restingHeartRate: self.restingHeartRate,
             respiratoryRate: self.respiratoryRate,
@@ -264,15 +272,6 @@ struct StressReading: Codable, Equatable, Identifiable {
         self.stressLevel = metrics.stressLevel
         self.heartRate = metrics.heartRate
         self.isExerciseRelated = metrics.isExerciseRelated
-    }
-    
-    var stressZone: StressZone {
-        switch stressLevel {
-        case 0.0..<1.0: return .low
-        case 1.0..<2.0: return .medium
-        case 2.0...3.0: return .high
-        default: return .medium
-        }
     }
 }
 
