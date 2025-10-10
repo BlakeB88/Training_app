@@ -3,11 +3,13 @@
     <entity name="DailyMetricsEntity" representedClassName="DailyMetricsEntity" syncable="YES">
         <attribute name="activeCalories" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="averageHeartRate" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="averageStress" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="baselineData" optional="YES" attributeType="Binary"/>
         <attribute name="date" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="hrvAverage" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="lastUpdated" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="maxStress" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="recovery" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="recoveryComponentsData" optional="YES" attributeType="Binary"/>
         <attribute name="respiratoryRate" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
@@ -21,7 +23,11 @@
         <attribute name="sleepStart" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="steps" optional="YES" attributeType="Integer 32" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="strain" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="stressReadingsData" optional="YES" attributeType="Binary"/>
         <attribute name="timeInBed" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="timeInHighStress" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="timeInLowStress" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="timeInMediumStress" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="vo2Max" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <relationship name="workouts" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="WorkoutRecordEntity" inverseName="dailyMetrics" inverseEntity="WorkoutRecordEntity"/>
     </entity>

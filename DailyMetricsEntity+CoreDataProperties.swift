@@ -40,6 +40,12 @@ extension DailyMetricsEntity {
     @NSManaged public var steps: Int32
     @NSManaged public var activeCalories: Double
     @NSManaged public var averageHeartRate: Double
+    @NSManaged public var averageStress: Double
+    @NSManaged public var maxStress: Double
+    @NSManaged public var stressReadingsData: Data?
+    @NSManaged public var timeInHighStress: Double
+    @NSManaged public var timeInMediumStress: Double
+    @NSManaged public var timeInLowStress: Double
     @NSManaged public var workouts: NSSet?
 
 }

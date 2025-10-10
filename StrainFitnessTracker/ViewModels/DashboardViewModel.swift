@@ -1,8 +1,8 @@
 //
-//  DashboardViewModel.swift (CONNECTED VERSION)
+//  DashboardViewModel.swift (UPDATED WITH STRESS INTEGRATION)
 //  StrainFitnessTracker
 //
-//  Connects to real HealthKit data via DataSyncService
+//  Now uses persisted stress data from repository
 //
 
 import Foundation
@@ -41,16 +41,17 @@ class DashboardViewModel: ObservableObject {
         self.metrics = DailyMetrics.sampleData
         self.weekData = StrainRecoveryWeekData.sampleData
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
-        
-        // Note: setupObservers will be called in initialize()
     }
     
     // MARK: - Computed Properties
     var lastStressUpdate: String {
-        guard let lastPoint = metrics.stressHistory.last else { return "" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: lastPoint.timestamp)
+        // Use persisted data from metrics, or real-time from VM
+        if let lastReading = metrics.stressHistory.last {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "h:mm a"
+            return formatter.string(from: lastReading.timestamp)
+        }
+        return ""
     }
     
     // MARK: - Public Methods
@@ -86,7 +87,7 @@ class DashboardViewModel: ObservableObject {
             }
         }
         
-        // Initialize stress monitoring
+        // Initialize stress monitoring (for real-time updates)
         await stressMonitorVM.initialize()
         
         // Try to load data from repository first (might have cached data)
@@ -112,7 +113,7 @@ class DashboardViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        // 1. Sync with HealthKit
+        // 1. Sync with HealthKit (now includes stress!)
         await dataSyncService.quickSync()
         
         // 2. Check for errors
@@ -201,18 +202,17 @@ class DashboardViewModel: ObservableObject {
         print("✅ Found metrics in repository:")
         print("  Date: \(simpleDailyMetrics.date.formatted())")
         print("  Sleep Duration: \(simpleDailyMetrics.sleepDuration ?? 0) hours")
-        print("  Time in Bed: \(simpleDailyMetrics.timeInBed ?? 0) hours")
-        print("  Sleep Efficiency: \(simpleDailyMetrics.sleepEfficiency ?? 0)%")
-        print("  Restorative Sleep %: \(simpleDailyMetrics.restorativeSleepPercentage ?? 0)%")
-        print("  Sleep Consistency: \(simpleDailyMetrics.sleepConsistency ?? 0)%")
-        print("  Sleep Debt: \(simpleDailyMetrics.sleepDebt ?? 0) hours")
         print("  Steps: \(simpleDailyMetrics.steps ?? 0)")
         print("  Calories: \(simpleDailyMetrics.activeCalories ?? 0)")
-        print("  VO2 Max: \(simpleDailyMetrics.vo2Max ?? 0)")
-        print("  Avg Heart Rate: \(simpleDailyMetrics.averageHeartRate ?? 0)")
-        print("  Respiratory Rate: \(simpleDailyMetrics.respiratoryRate ?? 0)")
         print("  Strain: \(simpleDailyMetrics.strain)")
         print("  Recovery: \(simpleDailyMetrics.recovery ?? 0)")
+        
+        // ✨ NEW: Log stress data
+        print("  📊 STRESS METRICS:")
+        print("    Average Stress: \(simpleDailyMetrics.averageStress ?? 0)")
+        print("    Max Stress: \(simpleDailyMetrics.maxStress ?? 0)")
+        print("    Stress Readings: \(simpleDailyMetrics.stressReadings?.count ?? 0)")
+        print("    Time in High Stress: \(simpleDailyMetrics.timeInHighStress ?? 0)h")
         
         // Load week data
         let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: date)!
@@ -229,9 +229,8 @@ class DashboardViewModel: ObservableObject {
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
         
         print("✅ Dashboard UI updated with real data")
-        print("  UI Sleep Duration: \(self.metrics.sleepDuration / 3600) hours")
-        print("  UI Steps: \(self.metrics.steps)")
-        print("  UI Calories: \(self.metrics.calories)")
+        print("  UI Stress History Count: \(self.metrics.stressHistory.count)")
+        print("  UI Current Stress: \(self.metrics.currentStress)")
     }
     
     private func setupObservers() {
@@ -245,51 +244,24 @@ class DashboardViewModel: ObservableObject {
             }
             .store(in: &cancellables)
         
-        // Observe stress updates
+        // ✨ UPDATED: Only use real-time stress for current reading updates
+        // Historical stress comes from repository now
         stressMonitorVM.$currentStress
             .compactMap { $0 }
             .sink { [weak self] stress in
-                self?.updateStress(stress)
+                // Only update current stress value, not history
+                self?.metrics.currentStress = stress.stressLevel
             }
             .store(in: &cancellables)
-    }
-    
-    private func updateStress(_ stress: StressMetrics) {
-        // Update current stress
-        metrics.currentStress = stress.stressLevel
-        
-        // Add to history
-        let stressPoint = StressDataPoint(
-            timestamp: stress.timestamp,
-            value: stress.stressLevel,
-            activity: nil // Could map from current workout
-        )
-        metrics.stressHistory.append(stressPoint)
-        
-        // Keep last 24 hours
-        let oneDayAgo = Date().addingTimeInterval(-24 * 60 * 60)
-        metrics.stressHistory = metrics.stressHistory.filter { $0.timestamp >= oneDayAgo }
     }
     
     // MARK: - Conversion Methods
     
     private func convertToUIMetrics(_ simple: SimpleDailyMetrics) -> DailyMetrics {
         print("🔄 Converting SimpleDailyMetrics to DailyMetrics...")
-        print("  📊 Sleep Duration: \(simple.sleepDuration ?? 0) hours")
-        print("  📊 Time in Bed: \(simple.timeInBed ?? 0) hours")
-        print("  📊 Sleep Efficiency: \(simple.sleepEfficiency ?? 0)%")
-        print("  📊 Restorative Sleep: \(simple.restorativeSleepPercentage ?? 0)%")
-        print("  📊 Sleep Consistency: \(simple.sleepConsistency ?? 0)%")
-        print("  📊 Sleep Debt: \(simple.sleepDebt ?? 0) hours")
-        print("  📊 Steps: \(simple.steps ?? 0)")
-        print("  📊 Calories: \(simple.activeCalories ?? 0)")
-        print("  📊 VO2 Max: \(simple.vo2Max ?? 0)")
-        print("  📊 Avg HR: \(simple.averageHeartRate ?? 0)")
-        print("  📊 Respiratory Rate: \(simple.respiratoryRate ?? 0)")
         
-        // Calculate sleep score (0-100 based on duration and quality)
+        // Calculate sleep score
         let sleepScore = calculateSleepScore(simple)
-        print("  💤 Calculated Sleep Score: \(sleepScore)")
         
         // Convert workouts to activities
         let activities = convertWorkoutsToActivities(simple.workouts)
@@ -305,8 +277,17 @@ class DashboardViewModel: ObservableObject {
                 duration: sleepDuration * 3600
             )
             allActivities.insert(sleepActivity, at: 0)
-            print("  😴 Added sleep activity: \(sleepDuration) hours")
         }
+        
+        // ✨ NEW: Convert stress readings from persisted data
+        let stressHistory = convertStressReadings(simple.stressReadings ?? [], activities: allActivities)
+        
+        // ✨ NEW: Use persisted stress or fall back to real-time
+        let currentStress = simple.averageStress ?? stressMonitorVM.currentStressLevel
+        
+        print("  📊 Converted stress data:")
+        print("    Stress history points: \(stressHistory.count)")
+        print("    Current stress: \(currentStress)")
         
         let metrics = DailyMetrics(
             date: simple.date,
@@ -314,7 +295,7 @@ class DashboardViewModel: ObservableObject {
             recoveryScore: simple.recovery ?? 0,
             strainScore: simple.strain,
             
-            // Sleep Metrics - NOW USING REAL DATA
+            // Sleep Metrics
             sleepDuration: (simple.sleepDuration ?? 0) * 3600,
             restorativeSleepPercentage: simple.restorativeSleepPercentage ?? 0,
             sleepEfficiency: simple.sleepEfficiency ?? 0,
@@ -323,16 +304,16 @@ class DashboardViewModel: ObservableObject {
             sleepDebt: (simple.sleepDebt ?? 0) * 3600,
             respiratoryRate: simple.respiratoryRate ?? simple.baselineMetrics?.respiratoryRateBaseline ?? 14.0,
             
-            // Activity Metrics - NOW USING REAL DATA
+            // Activity Metrics
             calories: Int(simple.activeCalories ?? 0),
             steps: simple.steps ?? 0,
             averageHeartRate: Int(simple.averageHeartRate ?? simple.restingHeartRate ?? 60),
             restingHeartRate: Int(simple.restingHeartRate ?? 60),
             vo2Max: simple.vo2Max ?? 0,
             
-            // Stress Metrics
-            currentStress: stressMonitorVM.currentStressLevel,
-            stressHistory: convertStressHistory(),
+            // ✨ NEW: Stress Metrics (from persisted data!)
+            currentStress: currentStress,
+            stressHistory: stressHistory,
             
             // Activities
             activities: allActivities,
@@ -342,9 +323,24 @@ class DashboardViewModel: ObservableObject {
             totalHealthMetrics: 5
         )
         
-        print("✅ Conversion complete. Sleep duration in metrics: \(metrics.sleepDuration / 3600) hours")
-        
         return metrics
+    }
+
+    /// ✨ NEW: Convert persisted StressReading objects to StressDataPoint for UI
+    private func convertStressReadings(_ readings: [StressReading], activities: [Activity]) -> [StressDataPoint] {
+        return readings.map { reading in
+            // Try to match with an activity
+            let matchingActivity = activities.first { activity in
+                reading.timestamp >= activity.startTime &&
+                reading.timestamp <= activity.endTime
+            }
+            
+            return StressDataPoint(
+                timestamp: reading.timestamp,
+                value: reading.stressLevel,
+                activity: matchingActivity
+            )
+        }
     }
 
     /// Improved sleep score calculation using multiple factors
@@ -366,7 +362,6 @@ class DashboardViewModel: ObservableObject {
         } else if duration < 7 {
             durationScore = max(0, (duration / 7.0) * 100)
         } else {
-            // Penalize over-sleeping less than under-sleeping
             durationScore = max(60, 100 - ((duration - 9) * 10))
         }
         score += durationScore * weights["duration"]!
@@ -389,7 +384,6 @@ class DashboardViewModel: ObservableObject {
     /// Improved metrics in range calculation
     private func calculateMetricsInRange(_ metrics: SimpleDailyMetrics) -> Int {
         var inRange = 0
-        let totalMetrics = 5
         
         // 1. Check HRV (within 15% of baseline)
         if let hrv = metrics.hrvAverage,
@@ -448,16 +442,6 @@ class DashboardViewModel: ObservableObject {
         }
     }
     
-    private func convertStressHistory() -> [StressDataPoint] {
-        return stressMonitorVM.todayStressData.map { stress in
-            StressDataPoint(
-                timestamp: stress.timestamp,
-                value: stress.stressLevel,
-                activity: nil
-            )
-        }
-    }
-    
     private func convertToWeekData(_ weekMetrics: [SimpleDailyMetrics]) -> StrainRecoveryWeekData {
         let dayData = weekMetrics.map { metrics in
             StrainRecoveryWeekData.DayData(
@@ -487,4 +471,3 @@ class DashboardViewModel: ObservableObject {
         ]
     }
 }
-

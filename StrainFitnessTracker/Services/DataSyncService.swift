@@ -3,7 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
-//  Updated: 10/9/25 - Fixed type mismatches
+//  Updated: 10/10/25 - Added stress monitoring integration
 //
 
 import Foundation
@@ -24,6 +24,7 @@ class DataSyncService: ObservableObject {
     private let workoutQuery: WorkoutQuery
     private let hrvQuery: HRVQuery
     private let sleepQuery: SleepQuery
+    private let stressQuery: StressQuery // NEW
     
     private let userDefaults = UserDefaults.standard
     private let lastSyncKey = "lastSyncDate"
@@ -38,6 +39,7 @@ class DataSyncService: ObservableObject {
         self.workoutQuery = WorkoutQuery(healthStore: healthStore)
         self.hrvQuery = HRVQuery(healthStore: healthStore)
         self.sleepQuery = SleepQuery(healthStore: healthStore)
+        self.stressQuery = StressQuery(healthStore: healthStore) // NEW
         
         self.lastSyncDate = userDefaults.object(forKey: lastSyncKey) as? Date
     }
@@ -136,9 +138,9 @@ class DataSyncService: ObservableObject {
         isSyncing = false
     }
         
-    // MARK: - NEW: Enhanced Metrics Fetching
+    // MARK: - Enhanced Metrics Fetching with Stress
 
-    /// Fetch all daily metrics including new health data
+    /// Fetch all daily metrics including stress data
     private func fetchEnhancedDailyMetrics(for date: Date) async throws -> SimpleDailyMetrics {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
@@ -162,7 +164,7 @@ class DataSyncService: ObservableObject {
             age: 30 // TODO: Get from user profile
         )
         
-        // Calculate daily strain using your existing method
+        // Calculate daily strain
         let strain = await StrainCalculator.calculateDailyStrain(
             workouts: hkWorkouts,
             hrProfile: hrProfile
@@ -175,7 +177,7 @@ class DataSyncService: ObservableObject {
             workoutSummaries.append(summary)
         }
         
-        // 3. Fetch ENHANCED sleep data (from previous night)
+        // 3. Fetch ENHANCED sleep data
         print("  😴 Fetching detailed sleep data...")
         let sleepStart = calendar.date(byAdding: .hour, value: -12, to: startOfDay)!
         let sleepData = try await healthKitManager.fetchDetailedSleepData(from: sleepStart, to: endOfDay)
@@ -189,19 +191,23 @@ class DataSyncService: ObservableObject {
         
         let (hrv, rhr, respiratoryRate, vo2Max) = try await (hrvTask, rhrTask, respRateTask, vo2MaxTask)
         
-        // 5. Fetch NEW activity metrics
+        // 5. Fetch activity metrics
         print("  🚶 Fetching activity metrics...")
         async let stepsTask = healthKitManager.fetchStepCount(from: startOfDay, to: endOfDay)
         async let avgHRTask = calculateAverageHeartRate(for: date)
         
         let (steps, averageHR) = try await (stepsTask, avgHRTask)
         
-        // 6. Calculate NEW sleep metrics
+        // 6. ✨ NEW: Calculate stress metrics
+        print("  😰 Calculating stress metrics...")
+        let stressData = try await calculateDailyStress(for: date, startOfDay: startOfDay, endOfDay: endOfDay)
+        
+        // 7. Calculate sleep metrics
         print("  📊 Calculating sleep metrics...")
         let sleepDebt = try await calculateSleepDebt(for: date, currentSleep: sleepData.totalSleepDuration / 3600)
         let sleepConsistency = try await calculateSleepConsistency(for: date)
         
-        // 7. Calculate recovery using your existing RecoveryCalculator
+        // 8. Calculate recovery
         var recovery: Double?
         var recoveryComponents: RecoveryComponents?
         var baselineMetrics: BaselineMetrics?
@@ -232,14 +238,14 @@ class DataSyncService: ObservableObject {
             }
         }
         
-        // 8. Update all metrics
+        // 9. Update all metrics
         print("  💾 Updating metrics...")
         
         // Strain & Workouts
         metrics.strain = strain
         metrics.workouts = workoutSummaries
         
-        // Sleep metrics (ALL NEW DATA)
+        // Sleep metrics
         if sleepData.totalSleepDuration > 0 {
             metrics.sleepDuration = sleepData.totalSleepDuration / 3600
             metrics.sleepStart = sleepData.sleepStart
@@ -263,18 +269,88 @@ class DataSyncService: ObservableObject {
         metrics.recoveryComponents = recoveryComponents
         metrics.baselineMetrics = baselineMetrics
         
-        // Activity metrics (ALL NEW DATA)
+        // Activity metrics
         metrics.steps = steps
         metrics.activeCalories = workoutSummaries.reduce(0.0) { $0 + $1.calories }
         metrics.averageHeartRate = averageHR
         
+        // ✨ NEW: Stress metrics
+        metrics.averageStress = stressData.average
+        metrics.maxStress = stressData.max
+        metrics.stressReadings = stressData.readings
+        metrics.timeInHighStress = stressData.timeInHigh
+        metrics.timeInMediumStress = stressData.timeInMedium
+        metrics.timeInLowStress = stressData.timeInLow
+        
         metrics.lastUpdated = Date()
         
         print("✅ Enhanced metrics fetched successfully")
+        print("   Stress: Avg=\(String(format: "%.1f", stressData.average)), Max=\(String(format: "%.1f", stressData.max)), Readings=\(stressData.readings.count)")
+        
         return metrics
     }
 
-    // MARK: - Helper Methods for New Metrics
+    // MARK: - NEW: Stress Calculation Methods
+
+    /// Calculate all stress metrics for a day
+    private func calculateDailyStress(
+        for date: Date,
+        startOfDay: Date,
+        endOfDay: Date
+    ) async throws -> (average: Double, max: Double, readings: [StressReading], timeInHigh: Double, timeInMedium: Double, timeInLow: Double) {
+        
+        do {
+            // Fetch all context data needed for stress calculation
+            let contextData = try await stressQuery.fetchStressContextData(from: startOfDay, to: endOfDay)
+            
+            // Check if we have baseline data
+            guard contextData.baselineRestingHeartRate != nil else {
+                print("  ⚠️ No baseline heart rate available for stress calculation")
+                return (0, 0, [], 0, 0, 0)
+            }
+            
+            // Calculate stress metrics for all readings
+            let stressMetrics = StressCalculator.calculateDailyStress(
+                from: contextData,
+                date: date
+            )
+            
+            // Filter out exercise-related readings
+            let nonExerciseMetrics = stressMetrics.filter { !$0.isExerciseRelated }
+            
+            guard !nonExerciseMetrics.isEmpty else {
+                print("  ℹ️ No valid stress readings for this day")
+                return (0, 0, [], 0, 0, 0)
+            }
+            
+            // Calculate summary statistics
+            let avgStress = nonExerciseMetrics.reduce(0.0) { $0 + $1.stressLevel } / Double(nonExerciseMetrics.count)
+            let maxStress = nonExerciseMetrics.map { $0.stressLevel }.max() ?? 0
+            
+            // Calculate time in each stress zone (assuming 5-minute intervals)
+            let highStressReadings = nonExerciseMetrics.filter { $0.stressLevel >= 2.0 }
+            let mediumStressReadings = nonExerciseMetrics.filter { $0.stressLevel >= 1.0 && $0.stressLevel < 2.0 }
+            let lowStressReadings = nonExerciseMetrics.filter { $0.stressLevel < 1.0 }
+            
+            let timeInHigh = Double(highStressReadings.count * 5) / 60.0 // Convert to hours
+            let timeInMedium = Double(mediumStressReadings.count * 5) / 60.0
+            let timeInLow = Double(lowStressReadings.count * 5) / 60.0
+            
+            // Convert to lightweight StressReading objects
+            let readings = nonExerciseMetrics.map { StressReading(from: $0) }
+            
+            print("  ✅ Stress calculated: \(nonExerciseMetrics.count) readings, avg=\(String(format: "%.1f", avgStress))")
+            
+            return (avgStress, maxStress, readings, timeInHigh, timeInMedium, timeInLow)
+            
+        } catch {
+            print("  ⚠️ Error calculating stress: \(error.localizedDescription)")
+            // Return zero values on error but don't fail the entire sync
+            return (0, 0, [], 0, 0, 0)
+        }
+    }
+
+    // MARK: - Helper Methods for Other Metrics
 
     /// Calculate average heart rate for the entire day
     private func calculateAverageHeartRate(for date: Date) async throws -> Double? {
@@ -358,164 +434,7 @@ class DataSyncService: ObservableObject {
         return consistency
     }
     
-    // MARK: - Private Sync Logic
-    
-    private func syncDay(_ date: Date) async throws {
-        let dayStart = date.startOfDay
-        let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)!
-        
-        print("   📊 Fetching workouts for \(dayStart.formatted(.dateTime.month().day()))...")
-        
-        // Fetch workouts
-        let hkWorkouts = try await workoutQuery.fetchWorkouts(from: dayStart, to: dayEnd)
-        print("   Found \(hkWorkouts.count) workouts")
-        
-        guard !hkWorkouts.isEmpty else {
-            print("   ⚠️ No workouts found, syncing recovery data only...")
-            // No workouts, but still sync recovery data
-            try await syncRecoveryOnly(for: date)
-            return
-        }
-        
-        // Get heart rate profile
-        let restingHR = try await workoutQuery.fetchRestingHeartRate() ?? 60.0
-        let maxHR = 220.0 - 30.0 // TODO: Get from user profile
-        let hrProfile = HeartRateProfile(
-            maxHeartRate: maxHR,
-            restingHeartRate: restingHR,
-            age: 30 // TODO: Get from user profile
-        )
-        
-        // Calculate daily strain
-        let totalStrain = await StrainCalculator.calculateDailyStrain(
-            workouts: hkWorkouts,
-            hrProfile: hrProfile
-        )
-        
-        // Create workout summaries
-        var workoutSummaries: [WorkoutSummary] = []
-        for hkWorkout in hkWorkouts {
-            let summary = try await createWorkoutSummary(hkWorkout, hrProfile: hrProfile)
-            workoutSummaries.append(summary)
-        }
-        
-        // Fetch sleep data
-        let sleepDuration = try await sleepQuery.fetchSleepDuration(from: dayStart, to: dayEnd)
-        
-        // Fetch HRV
-        let hrvReadings = try await hrvQuery.fetchHRVReadings(from: dayStart, to: dayEnd)
-        let hrvAverage = hrvReadings.isEmpty ? nil : hrvReadings.reduce(0.0, +) / Double(hrvReadings.count)
-        
-        // Calculate recovery
-        var recovery: Double?
-        var recoveryComponents: RecoveryComponents?
-        var baselineMetrics: BaselineMetrics?
-        
-        let historicalMetrics = try repository.fetchRecentDailyMetrics(days: 28)
-        if !historicalMetrics.isEmpty {
-            // Calculate baselines from SimpleDailyMetrics
-            baselineMetrics = calculateBaselinesFromSimpleMetrics(historicalMetrics, forDate: date)
-            
-            if let baseline = baselineMetrics {
-                recovery = RecoveryCalculator.calculateRecoveryScore(
-                    hrvCurrent: hrvAverage,
-                    hrvBaseline: baseline.hrvBaseline,
-                    rhrCurrent: restingHR,
-                    rhrBaseline: baseline.rhrBaseline,
-                    sleepDuration: sleepDuration
-                )
-                
-                recoveryComponents = RecoveryCalculator.recoveryComponents(
-                    hrvCurrent: hrvAverage,
-                    hrvBaseline: baseline.hrvBaseline,
-                    rhrCurrent: restingHR,
-                    rhrBaseline: baseline.rhrBaseline,
-                    sleepDuration: sleepDuration,
-                    respiratoryRate: nil
-                )
-            }
-        }
-        
-        // Create and save daily metrics using SimpleDailyMetrics
-        let dailyMetrics = SimpleDailyMetrics(
-            date: dayStart,
-            strain: totalStrain,
-            recovery: recovery,
-            recoveryComponents: recoveryComponents,
-            workouts: workoutSummaries,
-            sleepDuration: sleepDuration > 0 ? sleepDuration : nil,
-            sleepStart: nil,
-            sleepEnd: nil,
-            hrvAverage: hrvAverage,
-            restingHeartRate: restingHR,
-            baselineMetrics: baselineMetrics
-        )
-        
-        try repository.saveDailyMetrics(dailyMetrics)
-    }
-    
-    private func syncRecoveryOnly(for date: Date) async throws {
-        let dayStart = date.startOfDay
-        let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: dayStart)!
-        
-        // Check if we already have metrics for this day
-        if (try? repository.fetchDailyMetrics(for: date)) != nil {
-            // Already have data, skip
-            return
-        }
-        
-        // Fetch recovery data
-        let restingHR = try await workoutQuery.fetchRestingHeartRate() ?? 60.0
-        let sleepDuration = try await sleepQuery.fetchSleepDuration(from: dayStart, to: dayEnd)
-        let hrvReadings = try await hrvQuery.fetchHRVReadings(from: dayStart, to: dayEnd)
-        let hrvAverage = hrvReadings.isEmpty ? nil : hrvReadings.reduce(0.0, +) / Double(hrvReadings.count)
-        
-        // Calculate recovery
-        var recovery: Double?
-        var recoveryComponents: RecoveryComponents?
-        var baselineMetrics: BaselineMetrics?
-        
-        let historicalMetrics = try repository.fetchRecentDailyMetrics(days: 28)
-        if !historicalMetrics.isEmpty {
-            // Calculate baselines from SimpleDailyMetrics
-            baselineMetrics = calculateBaselinesFromSimpleMetrics(historicalMetrics, forDate: date)
-            
-            if let baseline = baselineMetrics {
-                recovery = RecoveryCalculator.calculateRecoveryScore(
-                    hrvCurrent: hrvAverage,
-                    hrvBaseline: baseline.hrvBaseline,
-                    rhrCurrent: restingHR,
-                    rhrBaseline: baseline.rhrBaseline,
-                    sleepDuration: sleepDuration
-                )
-                
-                recoveryComponents = RecoveryCalculator.recoveryComponents(
-                    hrvCurrent: hrvAverage,
-                    hrvBaseline: baseline.hrvBaseline,
-                    rhrCurrent: restingHR,
-                    rhrBaseline: baseline.rhrBaseline,
-                    sleepDuration: sleepDuration,
-                    respiratoryRate: nil
-                )
-            }
-        }
-        
-        // Create metrics with zero strain using SimpleDailyMetrics
-        let dailyMetrics = SimpleDailyMetrics(
-            date: dayStart,
-            strain: 0,
-            recovery: recovery,
-            recoveryComponents: recoveryComponents,
-            workouts: [],
-            sleepDuration: sleepDuration > 0 ? sleepDuration : nil,
-            sleepStart: nil,
-            sleepEnd: nil,
-            hrvAverage: hrvAverage,
-            restingHeartRate: restingHR
-        )
-        
-        try repository.saveDailyMetrics(dailyMetrics)
-    }
+    // MARK: - Workout Summary Creation
     
     private func createWorkoutSummary(_ workout: HKWorkout, hrProfile: HeartRateProfile) async throws -> WorkoutSummary {
         let workoutStrain = await StrainCalculator.calculateWorkoutStrain(
@@ -561,9 +480,9 @@ class DataSyncService: ObservableObject {
         userDefaults.set(lastSyncDate, forKey: lastSyncKey)
     }
     
-    // MARK: - Helper Methods
+    // MARK: - Baseline Calculation
     
-    /// Calculate baselines from SimpleDailyMetrics (instead of using BaselineCalculator which expects DailyMetrics)
+    /// Calculate baselines from SimpleDailyMetrics
     private func calculateBaselinesFromSimpleMetrics(_ metrics: [SimpleDailyMetrics], forDate date: Date) -> BaselineMetrics? {
         guard !metrics.isEmpty else { return nil }
         
@@ -611,6 +530,4 @@ class DataSyncService: ObservableObject {
         
         return sqrt(variance)
     }
-    
-    
 }
