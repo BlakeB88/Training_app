@@ -4,6 +4,7 @@
 //
 //  Created by Blake Burnley on 10/7/25.
 //  Updated: 10/9/25 - Updated to use SimpleDailyMetrics
+//  Fixed: 10/10/25 - Added missing property save/load operations
 //
 
 import Foundation
@@ -40,7 +41,7 @@ class MetricsRepository {
             entity.date = metrics.date.startOfDay
         }
         
-        // Update properties
+        // Update EXISTING properties
         entity.strain = metrics.strain
         entity.recovery = metrics.recovery ?? 0
         entity.sleepDuration = metrics.sleepDuration ?? 0
@@ -49,6 +50,18 @@ class MetricsRepository {
         entity.hrvAverage = metrics.hrvAverage ?? 0
         entity.restingHeartRate = metrics.restingHeartRate ?? 0
         entity.lastUpdated = metrics.lastUpdated
+        
+        // ✅ FIXED: Save NEW properties
+        entity.timeInBed = metrics.timeInBed ?? 0
+        entity.sleepEfficiency = metrics.sleepEfficiency ?? 0
+        entity.restorativeSleepPercentage = metrics.restorativeSleepPercentage ?? 0
+        entity.sleepDebt = metrics.sleepDebt ?? 0
+        entity.sleepConsistency = metrics.sleepConsistency ?? 0
+        entity.respiratoryRate = metrics.respiratoryRate ?? 0
+        entity.vo2Max = metrics.vo2Max ?? 0
+        entity.steps = Int32(metrics.steps ?? 0)
+        entity.activeCalories = metrics.activeCalories ?? 0
+        entity.averageHeartRate = metrics.averageHeartRate ?? 0
         
         // Delete existing workouts and recreate
         if let existingWorkouts = entity.workouts as? Set<WorkoutRecordEntity> {
@@ -280,11 +293,33 @@ class MetricsRepository {
             recovery: entity.recovery > 0 ? entity.recovery : nil,
             recoveryComponents: nil, // Not stored in Core Data
             workouts: workouts,
+            
+            // Sleep metrics
             sleepDuration: entity.sleepDuration > 0 ? entity.sleepDuration : nil,
             sleepStart: entity.sleepStart,
             sleepEnd: entity.sleepEnd,
+            
+            // ✅ FIXED: Load NEW sleep metrics
+            timeInBed: entity.timeInBed > 0 ? entity.timeInBed : nil,
+            sleepEfficiency: entity.sleepEfficiency > 0 ? entity.sleepEfficiency : nil,
+            restorativeSleepPercentage: entity.restorativeSleepPercentage > 0 ? entity.restorativeSleepPercentage : nil,
+            restorativeSleepDuration: nil, // Calculated, not stored separately
+            sleepDebt: entity.sleepDebt > 0 ? entity.sleepDebt : nil,
+            sleepConsistency: entity.sleepConsistency > 0 ? entity.sleepConsistency : nil,
+            
+            // Physiological metrics
             hrvAverage: entity.hrvAverage > 0 ? entity.hrvAverage : nil,
             restingHeartRate: entity.restingHeartRate > 0 ? entity.restingHeartRate : nil,
+            
+            // ✅ FIXED: Load NEW physiological metrics
+            respiratoryRate: entity.respiratoryRate > 0 ? entity.respiratoryRate : nil,
+            vo2Max: entity.vo2Max > 0 ? entity.vo2Max : nil,
+            
+            // ✅ FIXED: Load NEW activity metrics
+            steps: entity.steps > 0 ? Int(entity.steps) : nil,
+            activeCalories: entity.activeCalories > 0 ? entity.activeCalories : nil,
+            averageHeartRate: entity.averageHeartRate > 0 ? entity.averageHeartRate : nil,
+            
             baselineMetrics: nil, // Not stored in Core Data
             lastUpdated: entity.lastUpdated ?? Date()
         )
