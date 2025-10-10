@@ -1,9 +1,8 @@
 //
-//  DataSyncService.swift
+//  DataSyncService.swift - ENHANCED VERSION
 //  StrainFitnessTracker
 //
-//  Created by Blake Burnley on 10/7/25.
-//  Updated: 10/10/25 - Added stress monitoring integration
+//  Updated with force refresh capability and better stress data handling
 //
 
 import Foundation
@@ -18,16 +17,18 @@ class DataSyncService: ObservableObject {
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncError: Error?
+    @Published var lastStressDataFetch: Date? // NEW: Track when stress was last fetched
     
     private let healthKitManager: HealthKitManager
     private let repository: MetricsRepository
     private let workoutQuery: WorkoutQuery
     private let hrvQuery: HRVQuery
     private let sleepQuery: SleepQuery
-    private let stressQuery: StressQuery // NEW
+    private let stressQuery: StressQuery
     
     private let userDefaults = UserDefaults.standard
     private let lastSyncKey = "lastSyncDate"
+    private let lastStressFetchKey = "lastStressDataFetch" // NEW
     
     // MARK: - Initialization
     
@@ -39,21 +40,22 @@ class DataSyncService: ObservableObject {
         self.workoutQuery = WorkoutQuery(healthStore: healthStore)
         self.hrvQuery = HRVQuery(healthStore: healthStore)
         self.sleepQuery = SleepQuery(healthStore: healthStore)
-        self.stressQuery = StressQuery(healthStore: healthStore) // NEW
+        self.stressQuery = StressQuery(healthStore: healthStore)
         
         self.lastSyncDate = userDefaults.object(forKey: lastSyncKey) as? Date
+        self.lastStressDataFetch = userDefaults.object(forKey: lastStressFetchKey) as? Date
     }
     
     // MARK: - Sync Methods
 
-    /// Quick sync - only today's data
-    func quickSync() async {
+    /// Quick sync - only today's data (with force refresh option)
+    func quickSync(forceRefresh: Bool = false) async {
         guard !isSyncing else {
             print("⚠️ Already syncing, skipping quickSync")
             return
         }
         
-        print("🔄 Starting quick sync for today...")
+        print("🔄 Starting quick sync for today... (force: \(forceRefresh))")
         isSyncing = true
         syncError = nil
         
@@ -61,8 +63,8 @@ class DataSyncService: ObservableObject {
             let today = Date().startOfDay
             print("📅 Syncing: \(today.formatted(.dateTime.month().day().year()))")
             
-            // Use the enhanced fetch method
-            let metrics = try await fetchEnhancedDailyMetrics(for: today)
+            // Use the enhanced fetch method with force refresh
+            let metrics = try await fetchEnhancedDailyMetrics(for: today, forceRefresh: forceRefresh)
             try repository.saveDailyMetrics(metrics)
             
             updateLastSyncDate()
@@ -75,14 +77,14 @@ class DataSyncService: ObservableObject {
         isSyncing = false
     }
 
-    /// Full sync - last N days
-    func fullSync(days: Int = 7) async {
+    /// Full sync - last N days (with force refresh option)
+    func fullSync(days: Int = 7, forceRefresh: Bool = false) async {
         guard !isSyncing else {
             print("⚠️ Already syncing, skipping fullSync")
             return
         }
         
-        print("🔄 Starting full sync for last \(days) days...")
+        print("🔄 Starting full sync for last \(days) days... (force: \(forceRefresh))")
         isSyncing = true
         syncError = nil
         
@@ -94,8 +96,8 @@ class DataSyncService: ObservableObject {
             while currentDate <= endDate {
                 print("📅 Syncing: \(currentDate.formatted(.dateTime.month().day()))")
                 
-                // Use the enhanced fetch method
-                let metrics = try await fetchEnhancedDailyMetrics(for: currentDate)
+                // Use the enhanced fetch method with force refresh
+                let metrics = try await fetchEnhancedDailyMetrics(for: currentDate, forceRefresh: forceRefresh)
                 try repository.saveDailyMetrics(metrics)
                 
                 currentDate = Calendar.current.date(byAdding: .day, value: 1, to: currentDate)!
@@ -111,18 +113,18 @@ class DataSyncService: ObservableObject {
         isSyncing = false
     }
 
-    /// Sync specific date
-    func syncDate(_ date: Date) async {
+    /// Sync specific date (with force refresh option)
+    func syncDate(_ date: Date, forceRefresh: Bool = false) async {
         guard !isSyncing else { return }
         
         isSyncing = true
         syncError = nil
         
         do {
-            print("🔄 Syncing data for \(date.formatted())...")
+            print("🔄 Syncing data for \(date.formatted())... (force: \(forceRefresh))")
             
-            // Use the enhanced fetch method
-            let metrics = try await fetchEnhancedDailyMetrics(for: date)
+            // Use the enhanced fetch method with force refresh
+            let metrics = try await fetchEnhancedDailyMetrics(for: date, forceRefresh: forceRefresh)
             
             // Save to repository
             try repository.saveDailyMetrics(metrics)
@@ -137,19 +139,67 @@ class DataSyncService: ObservableObject {
         
         isSyncing = false
     }
+    
+    /// NEW: Force refresh stress data only (lightweight refresh)
+    func refreshStressData() async {
+        print("🔄 Force refreshing stress data...")
+        
+        do {
+            let today = Date().startOfDay
+            let now = Date()
+            
+            // Fetch fresh stress data
+            let stressData = try await calculateDailyStress(
+                for: today,
+                startOfDay: today,
+                endOfDay: now,
+                forceRefresh: true
+            )
+            
+            // Update only stress metrics in repository
+            if var metrics = try? repository.fetchDailyMetrics(for: today) {
+                metrics.averageStress = stressData.average
+                metrics.maxStress = stressData.max
+                metrics.stressReadings = stressData.readings
+                metrics.timeInHighStress = stressData.timeInHigh
+                metrics.timeInMediumStress = stressData.timeInMedium
+                metrics.timeInLowStress = stressData.timeInLow
+                metrics.lastUpdated = Date()
+                
+                try repository.saveDailyMetrics(metrics)
+                
+                lastStressDataFetch = Date()
+                userDefaults.set(lastStressDataFetch, forKey: lastStressFetchKey)
+                
+                print("✅ Stress data refreshed: \(stressData.readings.count) readings")
+            }
+            
+        } catch {
+            print("❌ Failed to refresh stress data: \(error)")
+        }
+    }
         
     // MARK: - Enhanced Metrics Fetching with Stress
 
     /// Fetch all daily metrics including stress data
-    private func fetchEnhancedDailyMetrics(for date: Date) async throws -> SimpleDailyMetrics {
+    private func fetchEnhancedDailyMetrics(for date: Date, forceRefresh: Bool = false) async throws -> SimpleDailyMetrics {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
         
-        print("📊 Fetching enhanced metrics for \(date.formatted())...")
+        print("📊 Fetching enhanced metrics for \(date.formatted())... (force: \(forceRefresh))")
         
         // 1. Get existing metrics or create new
         var metrics = (try? repository.fetchDailyMetrics(for: date)) ?? SimpleDailyMetrics(date: date)
+        
+        // NEW: Check if we should skip fetching (unless force refresh)
+        if !forceRefresh {
+            let timeSinceUpdate = Date().timeIntervalSince(metrics.lastUpdated)
+            if timeSinceUpdate < 60 {
+                print("  ⭐️ Skipping - data recently updated (\(Int(timeSinceUpdate))s ago)")
+                return metrics
+            }
+        }
         
         // 2. Fetch workouts and calculate strain
         print("  🏋️ Fetching workouts...")
@@ -198,9 +248,14 @@ class DataSyncService: ObservableObject {
         
         let (steps, averageHR) = try await (stepsTask, avgHRTask)
         
-        // 6. ✨ NEW: Calculate stress metrics
-        print("  😰 Calculating stress metrics...")
-        let stressData = try await calculateDailyStress(for: date, startOfDay: startOfDay, endOfDay: endOfDay)
+        // 6. ✨ Calculate stress metrics (with force refresh option)
+        print("  😰 Calculating stress metrics... (force: \(forceRefresh))")
+        let stressData = try await calculateDailyStress(
+            for: date,
+            startOfDay: startOfDay,
+            endOfDay: endOfDay,
+            forceRefresh: forceRefresh
+        )
         
         // 7. Calculate sleep metrics
         print("  📊 Calculating sleep metrics...")
@@ -274,7 +329,7 @@ class DataSyncService: ObservableObject {
         metrics.activeCalories = workoutSummaries.reduce(0.0) { $0 + $1.calories }
         metrics.averageHeartRate = averageHR
         
-        // ✨ NEW: Stress metrics
+        // ✨ Stress metrics
         metrics.averageStress = stressData.average
         metrics.maxStress = stressData.max
         metrics.stressReadings = stressData.readings
@@ -290,18 +345,32 @@ class DataSyncService: ObservableObject {
         return metrics
     }
 
-    // MARK: - NEW: Stress Calculation Methods
+    // MARK: - ENHANCED: Stress Calculation Methods
 
-    /// Calculate all stress metrics for a day
+    /// Calculate all stress metrics for a day (with force refresh to bypass cache)
     private func calculateDailyStress(
         for date: Date,
         startOfDay: Date,
-        endOfDay: Date
+        endOfDay: Date,
+        forceRefresh: Bool = false
     ) async throws -> (average: Double, max: Double, readings: [StressReading], timeInHigh: Double, timeInMedium: Double, timeInLow: Double) {
         
         do {
+            print("  📊 Fetching stress context data from HealthKit...")
+            
+            // NEW: Log what we're fetching
+            // Use current time if we're looking at today, otherwise use endOfDay
+            let now = Date()
+            let queryEndTime = Calendar.current.isDateInToday(date) ? now : endOfDay
+            print("    Time range: \(startOfDay.formatted(date: .omitted, time: .shortened)) to \(queryEndTime.formatted(date: .omitted, time: .shortened))")
+            
             // Fetch all context data needed for stress calculation
-            let contextData = try await stressQuery.fetchStressContextData(from: startOfDay, to: endOfDay)
+            let contextData = try await stressQuery.fetchStressContextData(from: startOfDay, to: queryEndTime)
+            
+            // NEW: Log what we got back
+            print("    HRV samples: \(contextData.hrvReadings.count)")
+            print("    Baseline RHR: \(contextData.baselineRestingHeartRate ?? 0)")
+            print("    Baseline HRV: \(contextData.baselineHRV ?? 0)")
             
             // Check if we have baseline data
             guard contextData.baselineRestingHeartRate != nil else {
@@ -315,8 +384,12 @@ class DataSyncService: ObservableObject {
                 date: date
             )
             
+            print("    Raw stress metrics calculated: \(stressMetrics.count)")
+            
             // Filter out exercise-related readings
             let nonExerciseMetrics = stressMetrics.filter { !$0.isExerciseRelated }
+            
+            print("    Non-exercise metrics: \(nonExerciseMetrics.count)")
             
             guard !nonExerciseMetrics.isEmpty else {
                 print("  ℹ️ No valid stress readings for this day")
@@ -339,7 +412,17 @@ class DataSyncService: ObservableObject {
             // Convert to lightweight StressReading objects
             let readings = nonExerciseMetrics.map { StressReading(from: $0) }
             
-            print("  ✅ Stress calculated: \(nonExerciseMetrics.count) readings, avg=\(String(format: "%.1f", avgStress))")
+            // NEW: Show time range of readings
+            if let firstReading = readings.first, let lastReading = readings.last {
+                print("    Reading time range: \(firstReading.timestamp.formatted(date: .omitted, time: .shortened)) to \(lastReading.timestamp.formatted(date: .omitted, time: .shortened))")
+            }
+            
+            print("  ✅ Stress calculated: \(nonExerciseMetrics.count) readings, avg=\(String(format: "%.1f", avgStress)), max=\(String(format: "%.1f", maxStress))")
+            print("    Distribution - Low: \(String(format: "%.1f", timeInLow))h, Med: \(String(format: "%.1f", timeInMedium))h, High: \(String(format: "%.1f", timeInHigh))h")
+            
+            // Update last fetch time
+            lastStressDataFetch = Date()
+            userDefaults.set(lastStressDataFetch, forKey: lastStressFetchKey)
             
             return (avgStress, maxStress, readings, timeInHigh, timeInMedium, timeInLow)
             
@@ -424,8 +507,6 @@ class DataSyncService: ObservableObject {
         let standardDeviation = sqrt(variance)
         
         // Convert to consistency score (0-100)
-        // Perfect consistency (0 std dev) = 100%
-        // 2 hours std dev or more = 0%
         let maxStdDev = 2.0
         let consistency = max(0, min(100, (1 - standardDeviation / maxStdDev) * 100))
         
@@ -448,7 +529,7 @@ class DataSyncService: ObservableObject {
         
         let intensity = avgHR.map { StrainCalculator.calculateHRIntensity(avgHR: $0, profile: hrProfile) }
         
-        // Get calories using new API
+        // Get calories
         let calories: Double
         if let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
            let energyStats = workout.statistics(for: energyType),
@@ -482,29 +563,22 @@ class DataSyncService: ObservableObject {
     
     // MARK: - Baseline Calculation
     
-    /// Calculate baselines from SimpleDailyMetrics
     private func calculateBaselinesFromSimpleMetrics(_ metrics: [SimpleDailyMetrics], forDate date: Date) -> BaselineMetrics? {
         guard !metrics.isEmpty else { return nil }
         
-        // Filter out metrics without required data
         let validMetrics = metrics.filter { $0.hrvAverage != nil && $0.restingHeartRate != nil }
         guard validMetrics.count >= AppConstants.Baseline.minimumDaysForBaseline else { return nil }
         
-        // Calculate HRV baseline
         let hrvValues = validMetrics.compactMap { $0.hrvAverage }
         let hrvBaseline = hrvValues.isEmpty ? nil : hrvValues.reduce(0.0, +) / Double(hrvValues.count)
         let hrvStdDev = hrvValues.isEmpty ? nil : standardDeviation(hrvValues)
         
-        // Calculate RHR baseline
         let rhrValues = validMetrics.compactMap { $0.restingHeartRate }
         let rhrBaseline = rhrValues.isEmpty ? nil : rhrValues.reduce(0.0, +) / Double(rhrValues.count)
         let rhrStdDev = rhrValues.isEmpty ? nil : standardDeviation(rhrValues)
         
-        // Calculate acute strain (last 7 days)
         let recentMetrics = metrics.suffix(7)
         let acuteStrain = recentMetrics.isEmpty ? nil : recentMetrics.reduce(0.0) { $0 + $1.strain } / Double(recentMetrics.count)
-        
-        // Calculate chronic strain (all available, up to 28 days)
         let chronicStrain = metrics.isEmpty ? nil : metrics.reduce(0.0) { $0 + $1.strain } / Double(metrics.count)
         
         return BaselineMetrics(
@@ -520,7 +594,6 @@ class DataSyncService: ObservableObject {
         )
     }
     
-    /// Calculate standard deviation
     private func standardDeviation(_ values: [Double]) -> Double {
         guard values.count > 1 else { return 0 }
         
