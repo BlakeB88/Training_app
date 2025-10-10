@@ -2,14 +2,12 @@
 //  SimpleDailyMetrics.swift
 //  StrainFitnessTracker
 //
-//  Created by Blake Burnley on 10/9/25.
-//  Simple model for persistence layer (different from dashboard DailyMetrics)
+//  Updated to include new health metrics
 //
 
 import Foundation
 
 /// Simplified daily metrics model for Core Data persistence
-/// This is separate from the dashboard DailyMetrics model
 struct SimpleDailyMetrics: Identifiable, Codable {
     let id: UUID
     let date: Date
@@ -26,10 +24,23 @@ struct SimpleDailyMetrics: Identifiable, Codable {
     var sleepDuration: Double? // in hours
     var sleepStart: Date?
     var sleepEnd: Date?
+    var timeInBed: Double? // NEW - in hours
+    var sleepEfficiency: Double? // NEW - percentage (0-100)
+    var restorativeSleepPercentage: Double? // NEW - percentage (0-100)
+    var restorativeSleepDuration: Double? // NEW - in hours
+    var sleepDebt: Double? // NEW - in hours
+    var sleepConsistency: Double? // NEW - percentage (0-100)
     
     // Physiological Metrics
     var hrvAverage: Double?
     var restingHeartRate: Double?
+    var respiratoryRate: Double? // NEW
+    var vo2Max: Double? // NEW
+    
+    // Activity Metrics
+    var steps: Int? // NEW
+    var activeCalories: Double? // NEW
+    var averageHeartRate: Double? // NEW
     
     // Baseline
     var baselineMetrics: BaselineMetrics?
@@ -48,8 +59,19 @@ struct SimpleDailyMetrics: Identifiable, Codable {
         sleepDuration: Double? = nil,
         sleepStart: Date? = nil,
         sleepEnd: Date? = nil,
+        timeInBed: Double? = nil,
+        sleepEfficiency: Double? = nil,
+        restorativeSleepPercentage: Double? = nil,
+        restorativeSleepDuration: Double? = nil,
+        sleepDebt: Double? = nil,
+        sleepConsistency: Double? = nil,
         hrvAverage: Double? = nil,
         restingHeartRate: Double? = nil,
+        respiratoryRate: Double? = nil,
+        vo2Max: Double? = nil,
+        steps: Int? = nil,
+        activeCalories: Double? = nil,
+        averageHeartRate: Double? = nil,
         baselineMetrics: BaselineMetrics? = nil,
         lastUpdated: Date = Date()
     ) {
@@ -62,8 +84,19 @@ struct SimpleDailyMetrics: Identifiable, Codable {
         self.sleepDuration = sleepDuration
         self.sleepStart = sleepStart
         self.sleepEnd = sleepEnd
+        self.timeInBed = timeInBed
+        self.sleepEfficiency = sleepEfficiency
+        self.restorativeSleepPercentage = restorativeSleepPercentage
+        self.restorativeSleepDuration = restorativeSleepDuration
+        self.sleepDebt = sleepDebt
+        self.sleepConsistency = sleepConsistency
         self.hrvAverage = hrvAverage
         self.restingHeartRate = restingHeartRate
+        self.respiratoryRate = respiratoryRate
+        self.vo2Max = vo2Max
+        self.steps = steps
+        self.activeCalories = activeCalories
+        self.averageHeartRate = averageHeartRate
         self.baselineMetrics = baselineMetrics
         self.lastUpdated = lastUpdated
     }
@@ -82,8 +115,19 @@ struct SimpleDailyMetrics: Identifiable, Codable {
             sleepDuration: self.sleepDuration,
             sleepStart: self.sleepStart,
             sleepEnd: self.sleepEnd,
+            timeInBed: self.timeInBed,
+            sleepEfficiency: self.sleepEfficiency,
+            restorativeSleepPercentage: self.restorativeSleepPercentage,
+            restorativeSleepDuration: self.restorativeSleepDuration,
+            sleepDebt: self.sleepDebt,
+            sleepConsistency: self.sleepConsistency,
             hrvAverage: self.hrvAverage,
             restingHeartRate: self.restingHeartRate,
+            respiratoryRate: self.respiratoryRate,
+            vo2Max: self.vo2Max,
+            steps: self.steps,
+            activeCalories: self.activeCalories,
+            averageHeartRate: self.averageHeartRate,
             baselineMetrics: self.baselineMetrics,
             lastUpdated: Date()
         )
@@ -101,18 +145,22 @@ struct SimpleDailyMetrics: Identifiable, Codable {
             sleepDuration: self.sleepDuration,
             sleepStart: self.sleepStart,
             sleepEnd: self.sleepEnd,
+            timeInBed: self.timeInBed,
+            sleepEfficiency: self.sleepEfficiency,
+            restorativeSleepPercentage: self.restorativeSleepPercentage,
+            restorativeSleepDuration: self.restorativeSleepDuration,
+            sleepDebt: self.sleepDebt,
+            sleepConsistency: self.sleepConsistency,
             hrvAverage: self.hrvAverage,
             restingHeartRate: self.restingHeartRate,
+            respiratoryRate: self.respiratoryRate,
+            vo2Max: self.vo2Max,
+            steps: self.steps,
+            activeCalories: self.activeCalories,
+            averageHeartRate: self.averageHeartRate,
             baselineMetrics: self.baselineMetrics,
             lastUpdated: Date()
         )
-    }
-    
-    /// Convert to dashboard DailyMetrics (if needed)
-    func toDashboardMetrics() -> DailyMetrics {
-        // This would convert to the full dashboard model
-        // You'll need to implement this based on your needs
-        fatalError("Not yet implemented - add conversion logic as needed")
     }
 }
 

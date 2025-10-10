@@ -2,7 +2,7 @@
 //  CircularProgressView.swift
 //  StrainFitnessTracker
 //
-//  Circular progress indicator matching Whoop design
+//  Circular progress indicator - NOW USING REAL DATA
 //
 
 import SwiftUI
@@ -13,13 +13,22 @@ struct CircularProgressView: View {
     let maxValue: Double
     let color: Color
     let showPercentage: Bool
+    let isInteractive: Bool
     
-    init(title: String, value: Double, maxValue: Double = 100, color: Color, showPercentage: Bool = true) {
+    init(
+        title: String,
+        value: Double,
+        maxValue: Double = 100,
+        color: Color,
+        showPercentage: Bool = true,
+        isInteractive: Bool = false
+    ) {
         self.title = title
         self.value = value
         self.maxValue = maxValue
         self.color = color
         self.showPercentage = showPercentage
+        self.isInteractive = isInteractive
     }
     
     private var progress: Double {
@@ -28,8 +37,10 @@ struct CircularProgressView: View {
     
     private var displayValue: String {
         if showPercentage {
+            // For percentage values, show as integer
             return "\(Int(value))%"
         } else {
+            // For strain values, show one decimal place
             return String(format: "%.1f", value)
         }
     }
@@ -56,10 +67,16 @@ struct CircularProgressView: View {
                     .rotationEffect(.degrees(-90))
                     .animation(.easeInOut(duration: 1), value: progress)
                 
-                // Value text
-                Text(displayValue)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundColor(.primaryText)
+                // Value text - handle "no data" state
+                if value == 0 {
+                    Text("--")
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.secondaryText)
+                } else {
+                    Text(displayValue)
+                        .font(.system(size: 24, weight: .bold, design: .rounded))
+                        .foregroundColor(.primaryText)
+                }
             }
             
             // Title with chevron
@@ -71,40 +88,9 @@ struct CircularProgressView: View {
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 8, weight: .semibold))
-                    .foregroundColor(.secondaryText)
+                    .foregroundColor(isInteractive ? color : .secondaryText)
             }
         }
-    }
-}
-
-// MARK: - Preview
-struct CircularProgressView_Previews: PreviewProvider {
-    static var previews: some View {
-        ZStack {
-            Color.appBackground.ignoresSafeArea()
-            
-            HStack(spacing: 20) {
-                CircularProgressView(
-                    title: "Sleep",
-                    value: 77,
-                    color: .sleepBlue
-                )
-                
-                CircularProgressView(
-                    title: "Recovery",
-                    value: 82,
-                    color: .recoveryGreen
-                )
-                
-                CircularProgressView(
-                    title: "Strain",
-                    value: 10.2,
-                    maxValue: 21,
-                    color: .strainBlue,
-                    showPercentage: false
-                )
-            }
-            .padding()
-        }
+        .contentShape(Rectangle())
     }
 }

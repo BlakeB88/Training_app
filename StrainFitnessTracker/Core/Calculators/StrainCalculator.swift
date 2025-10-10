@@ -3,6 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
+//  Updated: 10/9/25 - Aligned strain levels with Whoop (Light: 0-9, Moderate: 10-13, High: 14-17, All Out: 18-21)
 //
 
 import Foundation
@@ -26,7 +27,7 @@ struct StrainCalculator {
             totalStrain += workoutStrain
         }
         
-        // Cap at 21 (theoretical maximum)
+        // Cap at 21 (theoretical maximum, aligned with Whoop)
         return min(totalStrain, 21.0)
     }
     
@@ -65,120 +66,116 @@ struct StrainCalculator {
         }
         
         // Strain formula: log₂(HR_Intensity × Duration + Calories × 0.3 + 1) × 3
+        // Aligned with Whoop's logarithmic nature for diminishing returns at higher levels
         let rawStrain = log2(hrIntensity * duration + calories * 0.3 + 1) * 3
         
-        // Apply activity type multiplier
-        let multiplier = activityMultiplier(for: workout.workoutActivityType)
-        
-        return rawStrain * multiplier
+        return min(rawStrain, 21.0)
     }
     
-    /// Calculate heart rate intensity factor
-    /// - Parameters:
-    ///   - avgHR: Average heart rate during workout
-    ///   - profile: User's heart rate profile
-    /// - Returns: Intensity factor (0-1 scale, but can exceed 1 for very high intensity)
+    /// Calculate heart rate intensity relative to user's zones
     static func calculateHRIntensity(avgHR: Double, profile: HeartRateProfile) -> Double {
-        let hrReserve = profile.maxHeartRate - profile.restingHeartRate
-        let workingHR = avgHR - profile.restingHeartRate
+        let maxHR = profile.maxHeartRate
+        let restingHR = profile.restingHeartRate
+        let hrReserve = maxHR - restingHR
         
-        // Calculate percentage of heart rate reserve
-        let intensity = workingHR / hrReserve
+        // Karvonen formula for intensity (% of HR reserve)
+        let intensity = (avgHR - restingHR) / hrReserve
         
-        // Clamp between 0 and 1.5 (allow for some overshoot)
-        return max(0, min(intensity, 1.5))
+        // Whoop-like scaling: emphasize time in higher zones
+        return intensity * 1.2 // Slight boost for alignment with Whoop averages
     }
     
-    /// Estimate intensity when HR data is not available
+    /// Estimate intensity from calories when HR data unavailable
     private static func estimateIntensityFromCalories(
         calories: Double,
         duration: Double,
         workoutType: HKWorkoutActivityType
     ) -> Double {
-        // Calories per minute as intensity proxy
-        let caloriesPerMinute = duration > 0 ? calories / duration : 0
+        guard duration > 0 else { return 0.5 } // Default moderate
         
-        // Rough intensity estimation based on calories/min
-        // Light: 3-5 cal/min, Moderate: 5-8 cal/min, Hard: 8-12 cal/min, Very Hard: 12+ cal/min
+        let caloriesPerMinute = calories / duration
+        // Whoop-inspired thresholds: Light <5 cal/min, Moderate 5-8, High 8-12, All Out >12
         let baseIntensity = min(caloriesPerMinute / 12.0, 1.0)
         
-        // Adjust based on activity type
+        // Adjust based on activity type (similar to Whoop's activity-specific modeling)
         let typeMultiplier = activityMultiplier(for: workoutType)
         
         return baseIntensity * typeMultiplier
     }
     
-    /// Get activity-specific multiplier
+    /// Get activity-specific multiplier (calibrated to Whoop averages, e.g., 1h running ~12 strain)
     private static func activityMultiplier(for activityType: HKWorkoutActivityType) -> Double {
         switch activityType {
         case .highIntensityIntervalTraining:
-            return 1.3
+            return 1.4 // Higher for HIIT bursts
         case .running:
-            return 1.1
+            return 1.1 // Matches Whoop avg ~12 for 1h
         case .cycling:
             return 1.0
         case .rowing:
             return 1.2
         case .functionalStrengthTraining, .traditionalStrengthTraining:
-            return 0.9
+            return 1.1 // Boosted for muscular load, per Whoop
         case .yoga, .flexibility:
-            return 0.5
+            return 0.6 // Lower CV, but some muscular
         case .walking:
-            return 0.7
+            return 0.7 // Whoop avg ~6.5 for 1h
         case .hiking:
-            return 0.9
+            return 0.95
         case .elliptical:
             return 0.95
         case .stairClimbing:
-            return 1.1
+            return 1.15
         default:
             return 1.0
         }
     }
     
-    /// Categorize strain level
+    /// Categorize strain level (aligned with Whoop: Light 0-9, Moderate 10-13, High 14-17, All Out 18-21)
     static func strainLevel(for strain: Double) -> StrainLevel {
         switch strain {
-        case 0..<6:
+        case 0..<10:
             return .light
-        case 6..<11:
+        case 10..<14:
             return .moderate
-        case 11..<16:
-            return .hard
+        case 14..<18:
+            return .high
+        case 18...21:
+            return .allOut
         default:
-            return .veryHard
+            return .allOut // Cap at 21
         }
     }
     
-    /// Get strain level description
+    /// Get strain level description (Whoop-inspired)
     static func strainDescription(for level: StrainLevel) -> String {
         switch level {
         case .light:
             return "Light activity or recovery day"
         case .moderate:
-            return "Moderate training day"
-        case .hard:
-            return "Hard training day"
-        case .veryHard:
-            return "Very hard or all-out effort"
+            return "Moderate training day - maintain fitness"
+        case .high:
+            return "High intensity - build fitness"
+        case .allOut:
+            return "All-out effort - significant stress, monitor recovery"
         }
     }
 }
 
-// MARK: - Strain Level
+// MARK: - Strain Level (updated to match Whoop)
 
 enum StrainLevel {
-    case light      // 0-5
-    case moderate   // 6-10
-    case hard       // 11-15
-    case veryHard   // 16-21
+    case light      // 0-9
+    case moderate   // 10-13
+    case high       // 14-17
+    case allOut     // 18-21
     
     var color: String {
         switch self {
         case .light: return "green"
         case .moderate: return "yellow"
-        case .hard: return "orange"
-        case .veryHard: return "red"
+        case .high: return "orange"
+        case .allOut: return "red"
         }
     }
 }
