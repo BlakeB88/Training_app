@@ -26,6 +26,7 @@ struct MainTabView: View {
                     DashboardView()
                 case .health:
                     HealthChatView()
+                    
                 case .stress:
                     StressView()
                 case .more:
