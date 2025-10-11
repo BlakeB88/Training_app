@@ -3,6 +3,7 @@ import SwiftUI
 struct HealthChatView: View {
     @StateObject private var viewModel: HealthChatViewModel
     @FocusState private var isFocused: Bool
+    @State private var keyboardHeight: CGFloat = 0  // ← TRACKS KEYBOARD HEIGHT
     
     init(apiKey: String = AppConstants.geminiAPIKey) {
         _viewModel = StateObject(wrappedValue: HealthChatViewModel(apiKey: apiKey))
@@ -26,13 +27,39 @@ struct HealthChatView: View {
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-            }
-            // Keep everything visible above the tab bar
-            .safeAreaInset(edge: .bottom) {
+                
+                // Input Bar
                 inputBar
             }
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        // ← KEYBOARD OBSERVERS START HERE
+        .onAppear {
+            // Listen for keyboard show
+            NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardWillShowNotification,
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                    withAnimation {
+                        keyboardHeight = keyboardFrame.height
+                    }
+                }
+            }
+            
+            // Listen for keyboard hide
+            NotificationCenter.default.addObserver(
+                forName: UIResponder.keyboardWillHideNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                withAnimation {
+                    keyboardHeight = 0
+                }
+            }
+        }
+        // ← KEYBOARD OBSERVERS END HERE
     }
     
     // MARK: - Header View
@@ -92,8 +119,8 @@ struct HealthChatView: View {
                         LoadingMessageView()
                     }
                     
-                    // Padding for input box + tab bar
-                    Color.clear.frame(height: 100)
+                    // Small padding at bottom
+                    Color.clear.frame(height: 20)
                 }
                 .padding()
                 .onChange(of: viewModel.messages.count) { _, _ in
@@ -105,7 +132,7 @@ struct HealthChatView: View {
         }
     }
     
-    // MARK: - Input Bar (Fixed)
+    // MARK: - Input Bar (with Dynamic Keyboard Adjustment)
     
     private var inputBar: some View {
         VStack(spacing: 0) {
@@ -147,21 +174,22 @@ struct HealthChatView: View {
             }
             .padding(.horizontal, 16)
             .padding(.top, 12)
-            .padding(.bottom, 12)
-            .background(.regularMaterial)
+            // ← DYNAMIC PADDING: Changes based on keyboard visibility
+            .padding(.bottom, keyboardHeight > 0 ? 350 : 100)
+            .background(Color(.systemBackground))
         }
     }
     
     private func sendMessage() {
         let trimmed = viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty && !viewModel.isLoading else { return }
-        let messageText = trimmed
-        viewModel.sendMessage(messageText)
+        viewModel.sendMessage(trimmed)
         isFocused = false
     }
 }
 
 // MARK: - Chat Message View
+
 struct ChatMessageView: View {
     let message: ChatMessage
     
@@ -200,6 +228,7 @@ struct ChatMessageView: View {
 }
 
 // MARK: - Loading Message View
+
 struct LoadingMessageView: View {
     @State private var animationAmount = 1.0
     
@@ -229,6 +258,7 @@ struct LoadingMessageView: View {
 }
 
 // MARK: - Empty State View
+
 struct EmptyStateView: View {
     let onPromptTap: (String) -> Void
     
@@ -259,6 +289,7 @@ struct EmptyStateView: View {
 }
 
 // MARK: - Sample Prompt View
+
 struct SamplePrompt: View {
     let text: String
     let onTap: (String) -> Void
@@ -282,6 +313,7 @@ struct SamplePrompt: View {
 }
 
 // MARK: - Error Banner View
+
 struct ErrorBannerView: View {
     let message: String
     let onDismiss: () -> Void
@@ -309,8 +341,8 @@ struct ErrorBannerView: View {
     }
 }
 
-
 // MARK: - Preview
+
 #Preview {
     HealthChatView(apiKey: "demo-key")
 }
