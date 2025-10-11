@@ -129,4 +129,6 @@ struct AppConstants {
         static let animationDuration: Double = 0.3
         static let ringLineWidth: CGFloat = 20.0
     }
+    
+    static let geminiAPIKey = "AIzaSyCLjVIiP0ZmwHPWSlMPVA-Q6IKh7QteNAM"
 }

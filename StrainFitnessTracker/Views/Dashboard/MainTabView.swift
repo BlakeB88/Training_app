@@ -25,7 +25,7 @@ struct MainTabView: View {
                 case .home:
                     DashboardView()
                 case .health:
-                    HealthView()
+                    HealthChatView()
                 case .stress:
                     StressView()
                 case .more:
@@ -44,8 +44,8 @@ struct MainTabView: View {
                 }
                 
                 TabBarButton(
-                    icon: "heart.text.square.fill",
-                    label: "Health",
+                    icon: "bubble.left.and.bubble.right",
+                    label: "Health Chat",
                     isSelected: selectedTab == .health
                 ) {
                     selectedTab = .health
