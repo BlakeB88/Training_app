@@ -2,12 +2,26 @@ import Foundation
 
 class GeminiAIService {
     private let apiKey: String
-    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
     
+    // ✅ CORRECT models for your API key (Oct 2025)
+    // Based on your available models that support generateContent
+    private let modelNames = [
+        "gemini-flash-latest",       // Always points to latest stable
+        "gemini-2.5-flash",           // Stable Gemini 2.5 Flash (June 2025)
+        "gemini-2.0-flash",           // Stable Gemini 2.0 Flash
+        "gemini-2.5-pro",             // More powerful but slower
+        "gemini-pro-latest"           // Pro version fallback
+    ]
+    
+    private var workingModel: String?
     private let session = URLSession.shared
     
     init(apiKey: String) {
         self.apiKey = apiKey
+    }
+    
+    private func getBaseURL(for model: String) -> String {
+        return "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent"
     }
     
     func chat(
@@ -21,37 +35,58 @@ class GeminiAIService {
         
         let requestBody = GeminiRequest(contents: [GeminiContent(parts: messages)])
         
-        var request = URLRequest(url: URL(string: baseURL + "?key=\(apiKey)")!)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // If we have a working model, use it. Otherwise try each model until one works
+        let modelsToTry = workingModel != nil ? [workingModel!] : modelNames
         
-        do {
-            request.httpBody = try JSONEncoder().encode(requestBody)
-        } catch {
-            throw AIServiceError.encodingFailed("Failed to encode request: \(error.localizedDescription)")
-        }
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AIServiceError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            if let errorData = try? JSONDecoder().decode(GeminiErrorResponse.self, from: data) {
-                throw AIServiceError.apiError(errorData.error?.message ?? "Unknown error")
+        for modelName in modelsToTry {
+            do {
+                let baseURL = getBaseURL(for: modelName)
+                var request = URLRequest(url: URL(string: baseURL + "?key=\(apiKey)")!)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                
+                request.httpBody = try JSONEncoder().encode(requestBody)
+                
+                let (data, response) = try await session.data(for: request)
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    continue
+                }
+                
+                if httpResponse.statusCode == 200 {
+                    let decodedResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
+                    
+                    guard let content = decodedResponse.candidates.first?.content,
+                          let textPart = content.parts.first?.text else {
+                        throw AIServiceError.invalidResponse
+                    }
+                    
+                    // Save the working model for future requests
+                    workingModel = modelName
+                    print("✅ Using model: \(modelName)")
+                    
+                    return textPart
+                } else if httpResponse.statusCode == 404 {
+                    // Model not found, try next one
+                    print("⚠️ Model \(modelName) not found, trying next...")
+                    continue
+                } else {
+                    if let errorData = try? JSONDecoder().decode(GeminiErrorResponse.self, from: data) {
+                        throw AIServiceError.apiError(errorData.error?.message ?? "Unknown error")
+                    }
+                    throw AIServiceError.httpError(httpResponse.statusCode)
+                }
+            } catch let error as AIServiceError {
+                // If it's a definitive error (not 404), throw it
+                throw error
+            } catch {
+                // Try next model
+                continue
             }
-            throw AIServiceError.httpError(httpResponse.statusCode)
         }
         
-        let decodedResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
-        
-        guard let content = decodedResponse.candidates.first?.content,
-              let textPart = content.parts.first?.text else {
-            throw AIServiceError.invalidResponse
-        }
-        
-        return textPart
+        // If we get here, none of the models worked
+        throw AIServiceError.apiError("No compatible Gemini models found. Please check your API key and enabled models at https://aistudio.google.com")
     }
     
     private func buildSystemPrompt(healthContext: String) -> String {
