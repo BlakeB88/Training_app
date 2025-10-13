@@ -3,18 +3,21 @@ import Foundation
 class GeminiAIService {
     private let apiKey: String
     
-    // ✅ CORRECT models for your API key (Oct 2025)
-    // Based on your available models that support generateContent
+    // ✅ Prioritize Flash models for better rate limits
     private let modelNames = [
-        "gemini-flash-latest",       // Always points to latest stable
-        "gemini-2.5-flash",           // Stable Gemini 2.5 Flash (June 2025)
-        "gemini-2.0-flash",           // Stable Gemini 2.0 Flash
-        "gemini-2.5-pro",             // More powerful but slower
-        "gemini-pro-latest"           // Pro version fallback
+        "gemini-2.5-flash",           // 15 RPM, 250K TPM - BEST for free tier
+        "gemini-flash-latest",        // 15 RPM, 250K TPM
+        "gemini-2.0-flash",           // Good fallback
+        "gemini-2.5-pro",             // Only 2 RPM - AVOID unless necessary
+        "gemini-pro-latest"
     ]
     
     private var workingModel: String?
     private let session = URLSession.shared
+    
+    // Rate limiting
+    private var lastRequestTime: Date?
+    private let minimumRequestInterval: TimeInterval = 4.5 // 4.5 seconds between requests
     
     init(apiKey: String) {
         self.apiKey = apiKey
@@ -29,9 +32,21 @@ class GeminiAIService {
         healthContext: String,
         conversationHistory: [ChatMessage]
     ) async throws -> String {
-        // Build the full prompt with health context
-        let systemPrompt = buildSystemPrompt(healthContext: healthContext)
-        let messages = buildMessages(systemPrompt: systemPrompt, history: conversationHistory, userMessage: userMessage)
+        // Rate limiting: Wait if we're making requests too quickly
+        if let lastTime = lastRequestTime {
+            let timeSinceLastRequest = Date().timeIntervalSince(lastTime)
+            if timeSinceLastRequest < minimumRequestInterval {
+                let waitTime = minimumRequestInterval - timeSinceLastRequest
+                try await Task.sleep(nanoseconds: UInt64(waitTime * 1_000_000_000))
+            }
+        }
+        
+        // Build optimized messages
+        let messages = buildOptimizedMessages(
+            systemPrompt: buildSystemPrompt(healthContext: healthContext),
+            history: conversationHistory,
+            userMessage: userMessage
+        )
         
         let requestBody = GeminiRequest(contents: [GeminiContent(parts: messages)])
         
@@ -48,6 +63,9 @@ class GeminiAIService {
                 request.httpBody = try JSONEncoder().encode(requestBody)
                 
                 let (data, response) = try await session.data(for: request)
+                
+                // Update last request time
+                lastRequestTime = Date()
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
                     continue
@@ -70,6 +88,12 @@ class GeminiAIService {
                     // Model not found, try next one
                     print("⚠️ Model \(modelName) not found, trying next...")
                     continue
+                } else if httpResponse.statusCode == 429 {
+                    // Rate limit hit
+                    if let errorData = try? JSONDecoder().decode(GeminiErrorResponse.self, from: data) {
+                        throw AIServiceError.rateLimitExceeded(errorData.error?.message ?? "Rate limit exceeded")
+                    }
+                    throw AIServiceError.rateLimitExceeded("Too many requests. Please wait a moment.")
                 } else {
                     if let errorData = try? JSONDecoder().decode(GeminiErrorResponse.self, from: data) {
                         throw AIServiceError.apiError(errorData.error?.message ?? "Unknown error")
@@ -90,35 +114,32 @@ class GeminiAIService {
     }
     
     private func buildSystemPrompt(healthContext: String) -> String {
+        // ✅ SHORTER system prompt - only essential info
         return """
-        You are a knowledgeable health and fitness coach assisting a user with their fitness tracking app.
+        You are a helpful health coach. Keep responses concise (2-3 paragraphs).
         
-        IMPORTANT GUIDELINES:
-        - You have access to the user's real health data below. Use this data to provide personalized insights.
-        - Always be encouraging and supportive while remaining honest about health metrics.
-        - If the user asks about medical conditions, advise them to consult a healthcare professional.
-        - Provide actionable, specific recommendations based on their data.
-        - Be concise but thorough in your responses (2-3 paragraphs typical).
-        
-        USER'S CURRENT HEALTH DATA:
+        Current metrics:
         \(healthContext)
         
-        Remember: You are a coach/assistant, not a doctor. Always recommend professional medical consultation for serious concerns.
+        Note: Recommend consulting healthcare professionals for medical concerns.
         """
     }
     
-    private func buildMessages(
+    private func buildOptimizedMessages(
         systemPrompt: String,
         history: [ChatMessage],
         userMessage: String
     ) -> [GeminiPart] {
         var parts: [GeminiPart] = []
         
-        // Add system prompt as the first message
+        // Add system prompt ONCE at the start
         parts.append(GeminiPart(text: systemPrompt))
         
-        // Add conversation history
-        for message in history {
+        // ✅ LIMIT conversation history to last 6 messages (3 exchanges)
+        // This prevents token bloat while maintaining context
+        let recentHistory = Array(history.suffix(6))
+        
+        for message in recentHistory {
             let prefix = message.isUser ? "User: " : "Assistant: "
             parts.append(GeminiPart(text: prefix + message.content))
         }
@@ -190,6 +211,7 @@ enum AIServiceError: LocalizedError {
     case invalidResponse
     case httpError(Int)
     case apiError(String)
+    case rateLimitExceeded(String)
     case encodingFailed(String)
     case invalidURL
     
@@ -201,6 +223,8 @@ enum AIServiceError: LocalizedError {
             return "HTTP Error \(code)"
         case .apiError(let message):
             return "AI Service Error: \(message)"
+        case .rateLimitExceeded(let message):
+            return "Rate limit: \(message)"
         case .encodingFailed(let message):
             return message
         case .invalidURL:
