@@ -129,6 +129,9 @@ struct HealthChatView: View {
                     }
                 }
             }
+            .onTapGesture {
+                isFocused = false
+            }
         }
     }
     
@@ -152,6 +155,12 @@ struct HealthChatView: View {
                     .onSubmit {
                         sendMessage()
                     }
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                // Prevents tap gesture from dismissing keyboard when interacting with TextField
+                            }
+                    )
                 
                 Button(action: sendMessage) {
                     ZStack {
@@ -175,7 +184,7 @@ struct HealthChatView: View {
             .padding(.horizontal, 16)
             .padding(.top, 12)
             // ← DYNAMIC PADDING: Changes based on keyboard visibility
-            .padding(.bottom, keyboardHeight > 0 ? 350 : 100)
+            .padding(.bottom, keyboardHeight > 0 ? 340 : 100)
             .background(Color(.systemBackground))
         }
     }
