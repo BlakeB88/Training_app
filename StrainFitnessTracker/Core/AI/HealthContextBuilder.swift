@@ -94,7 +94,7 @@ class HealthContextBuilder {
         let totalWorkouts = metrics.flatMap { $0.workouts }.count
         parts.append("\(totalWorkouts) workouts")
         
-        return parts.joined(separator(", ")
+        return parts.joined(separator: ", ")
     }
     
     // Helper formatters
