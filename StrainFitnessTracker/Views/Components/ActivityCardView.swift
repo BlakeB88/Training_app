@@ -1,9 +1,8 @@
 //
-//  ActivityCardView.swift (UPDATED with Navigation)
+//  ActivityCardView.swift (FIXED)
 //  StrainFitnessTracker
 //
 //  Activity card with tap navigation to detail views
-//  Replace existing: StrainFitnessTracker/Views/Components/ActivityCardView.swift
 //
 
 import SwiftUI
@@ -79,18 +78,6 @@ struct ActivityCardView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .onAppear {
-            // Debug: Check what we have
-            if activity.type != .sleep {
-                print("📱 ActivityCard for: \(activity.type.rawValue)")
-                print("   Activity ID: \(activity.id)")
-                print("   Workout in dict: \(workoutDetails[activity.id] != nil ? "YES" : "NO")")
-                if let workout = workoutDetails[activity.id] {
-                    print("   Workout HR: \(workout.averageHeartRate ?? 0)")
-                    print("   Workout Cal: \(workout.calories)")
-                }
-            }
-        }
         .sheet(isPresented: $showDetail) {
             navigationDestination
         }
@@ -104,12 +91,20 @@ struct ActivityCardView: View {
                     sleepStart: activity.startTime,
                     sleepEnd: activity.endTime,
                     sleepDuration: activity.duration / 3600.0,
-                    sleepData: nil // This should be fetched from your data source
+                    sleepData: sleepData
                 )
             }
         } else {
             NavigationStack {
-                WorkoutDetailView(workout: convertToWorkoutSummary(activity))
+                // ✅ FIX: Use the actual workout from workoutDetails dictionary!
+                if let workout = workoutDetails[activity.id] {
+                    WorkoutDetailView(workout: workout)
+                } else {
+                    // Fallback if workout not found
+                    Text("Workout data not available")
+                        .foregroundColor(.secondaryText)
+                        .navigationTitle("Workout")
+                }
             }
         }
     }
@@ -122,38 +117,12 @@ struct ActivityCardView: View {
         default: return Color(red: 1.0, green: 0.2, blue: 0.2)
         }
     }
-    
-    private func convertToWorkoutSummary(_ activity: Activity) -> WorkoutSummary {
-        // Convert Activity to WorkoutSummary
-        // This is a placeholder - you should fetch the actual workout data
-        return WorkoutSummary(
-            id: activity.id,
-            workoutType: activityTypeToHKWorkoutType(activity.type),
-            startDate: activity.startTime,
-            endDate: activity.endTime,
-            duration: activity.duration,
-            distance: nil,
-            calories: 0,
-            averageHeartRate: nil,
-            maxHeartRate: nil,
-            strain: activity.strain ?? 0
-        )
-    }
-    
-    private func activityTypeToHKWorkoutType(_ type: Activity.ActivityType) -> HKWorkoutActivityType {
-        switch type {
-        case .swimming: return .swimming
-        case .running: return .running
-        case .cycling: return .cycling
-        case .workout: return .traditionalStrengthTraining
-        case .walking: return .walking
-        case .sleep: return .other
-        }
-    }
 }
 
 #Preview {
     VStack(spacing: 12) {
+        let workoutId = UUID()
+        
         // Sleep activity preview
         ActivityCardView(
             activity: Activity(
@@ -167,9 +136,10 @@ struct ActivityCardView: View {
             sleepData: nil
         )
         
-        // Workout activity preview
+        // Workout activity preview with real data
         ActivityCardView(
             activity: Activity(
+                id: workoutId,
                 type: .swimming,
                 startTime: Date().addingTimeInterval(-7200),
                 endTime: Date().addingTimeInterval(-1800),
@@ -177,8 +147,8 @@ struct ActivityCardView: View {
                 duration: 5400
             ),
             workoutDetails: [
-                UUID(): WorkoutSummary(
-                    id: UUID(),
+                workoutId: WorkoutSummary(
+                    id: workoutId,
                     workoutType: .swimming,
                     startDate: Date().addingTimeInterval(-7200),
                     endDate: Date().addingTimeInterval(-1800),
