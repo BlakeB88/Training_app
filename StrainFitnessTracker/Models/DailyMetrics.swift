@@ -46,14 +46,33 @@ struct DailyMetrics: Identifiable {
     var totalHealthMetrics: Int
 }
 
-// MARK: - Activity
 struct Activity: Identifiable {
-    let id = UUID()
+    let id: UUID
     let type: ActivityType
     let startTime: Date
     let endTime: Date
     let strain: Double?
     let duration: TimeInterval
+    
+    // Default initializer with auto-generated ID
+    init(type: ActivityType, startTime: Date, endTime: Date, strain: Double?, duration: TimeInterval) {
+        self.id = UUID()
+        self.type = type
+        self.startTime = startTime
+        self.endTime = endTime
+        self.strain = strain
+        self.duration = duration
+    }
+    
+    // Initializer with explicit ID (for workout mapping)
+    init(id: UUID, type: ActivityType, startTime: Date, endTime: Date, strain: Double?, duration: TimeInterval) {
+        self.id = id
+        self.type = type
+        self.startTime = startTime
+        self.endTime = endTime
+        self.strain = strain
+        self.duration = duration
+    }
     
     enum ActivityType: String {
         case sleep = "SLEEP"
