@@ -18,6 +18,8 @@ class DashboardViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var needsAuthorization: Bool = false
+    @Published var workoutDetails: [UUID: WorkoutSummary] = [:]
+    @Published var sleepDetails: [UUID: HealthKitManager.SleepData] = [:]
     
     // MARK: - Dependencies
     private let dataSyncService: DataSyncService
@@ -336,6 +338,19 @@ class DashboardViewModel: ObservableObject {
         
         // Debug data freshness
         debugStressDataFreshness()
+        
+        if let sleepStart = simpleDailyMetrics.sleepStart,
+            let sleepEnd = simpleDailyMetrics.sleepEnd {
+            do {
+                let sleepData = try await HealthKitManager.shared.fetchDetailedSleepData(
+                    from: sleepStart,
+                    to: sleepEnd
+                )
+                self.todaysSleepData = sleepData
+            } catch {
+                print("Failed to fetch sleep data: \(error)")
+            }
+        }
     }
     
     private func setupObservers() {
@@ -388,6 +403,10 @@ class DashboardViewModel: ObservableObject {
                 duration: sleepDuration * 3600
             )
             allActivities.insert(sleepActivity, at: 0)
+        }
+        
+        for workout in simple.workouts {
+            workoutDetails[workout.id] = workout
         }
         
         // ✨ Convert stress readings from persisted data
