@@ -2,7 +2,7 @@
 //  StrainDetailView.swift
 //  StrainFitnessTracker
 //
-//  Updated: 10/10/25 - Complete redesign with strain components breakdown
+//  Updated: 10/15/25 - Updated with new swimming & strength training calculations
 //
 
 import SwiftUI
@@ -48,6 +48,9 @@ struct StrainDetailView: View {
                     if let acwr = viewModel.acwr {
                         acwrCard(acwr)
                     }
+                    
+                    // Explanation card
+                    strainExplanationCard
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
@@ -171,7 +174,7 @@ struct StrainDetailView: View {
                     Text("Moderate")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondaryText)
-                    Text("9-14")
+                    Text("10-13")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.primaryText)
                 }
@@ -181,14 +184,14 @@ struct StrainDetailView: View {
                     Text("High")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondaryText)
-                    Text("14-18")
+                    Text("14-17")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundColor(.primaryText)
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Very High")
+                    Text("All Out")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondaryText)
                     Text("18-21")
@@ -214,50 +217,50 @@ struct StrainDetailView: View {
     // MARK: - Strain Components Section
     private var strainComponentsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("STRAIN COMPONENTS")
+            Text("STRAIN BREAKDOWN")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.secondaryText)
                 .tracking(0.5)
             
             VStack(spacing: 12) {
-                // Cardiovascular Strain
+                // Heart Rate Intensity
                 StrainComponentCard(
-                    title: "Cardiovascular",
-                    value: calculateCardiovascularStrain(),
-                    percentage: (calculateCardiovascularStrain() / max(viewModel.currentStrain, 0.1)) * 100,
+                    title: "Heart Rate Intensity",
+                    value: calculateAverageHRIntensity(),
+                    percentage: (calculateAverageHRIntensity() / max(viewModel.currentStrain, 0.1)) * 100,
                     icon: "heart.fill",
                     color: .red,
-                    description: "Heart rate elevation and duration"
+                    description: "Average cardiovascular effort"
                 )
                 
-                // Muscular Strain
+                // Total Duration
                 StrainComponentCard(
-                    title: "Muscular Load",
-                    value: calculateMuscularStrain(),
-                    percentage: (calculateMuscularStrain() / max(viewModel.currentStrain, 0.1)) * 100,
-                    icon: "figure.strengthtraining.traditional",
-                    color: .orange,
-                    description: "Intensity and volume of workouts"
-                )
-                
-                // Workout Duration
-                StrainComponentCard(
-                    title: "Duration",
-                    value: Double(viewModel.workouts.count),
-                    percentage: min(Double(viewModel.workouts.count) * 15, 100),
+                    title: "Total Duration",
+                    value: totalWorkoutDuration(),
+                    percentage: min((totalWorkoutDuration() / 120.0) * 100, 100),
                     icon: "clock.fill",
                     color: .blue,
-                    description: "\(viewModel.workouts.count) activity/activities"
+                    description: formatTotalDuration()
                 )
                 
-                // Workout Frequency
+                // Caloric Expenditure
                 StrainComponentCard(
-                    title: "Intensity",
-                    value: calculateAverageIntensity(),
-                    percentage: (calculateAverageIntensity() / 3.0) * 100,
-                    icon: "bolt.fill",
-                    color: .yellow,
-                    description: "Average HR intensity level"
+                    title: "Caloric Expenditure",
+                    value: totalCalories(),
+                    percentage: min((totalCalories() / 1000.0) * 100, 100),
+                    icon: "flame.fill",
+                    color: .orange,
+                    description: "\(Int(totalCalories())) calories burned"
+                )
+                
+                // Workout Count
+                StrainComponentCard(
+                    title: "Activities",
+                    value: Double(viewModel.workouts.count),
+                    percentage: min(Double(viewModel.workouts.count) * 25, 100),
+                    icon: "figure.mixed.cardio",
+                    color: .purple,
+                    description: "\(viewModel.workouts.count) workout\(viewModel.workouts.count == 1 ? "" : "s") today"
                 )
             }
         }
@@ -270,10 +273,18 @@ struct StrainDetailView: View {
     // MARK: - Workouts Section
     private var workoutsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("TODAY'S ACTIVITIES")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.secondaryText)
-                .tracking(0.5)
+            HStack {
+                Text("TODAY'S ACTIVITIES")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.secondaryText)
+                    .tracking(0.5)
+                
+                Spacer()
+                
+                Text("\(viewModel.workouts.count) total")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.tertiaryText)
+            }
             
             VStack(spacing: 12) {
                 ForEach(viewModel.workouts) { workout in
@@ -290,10 +301,20 @@ struct StrainDetailView: View {
     // MARK: - Weekly Trend Section
     private var weeklyTrendSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("7-DAY TREND")
-                .font(.system(size: 11, weight: .bold))
-                .foregroundColor(.secondaryText)
-                .tracking(0.5)
+            HStack {
+                Text("7-DAY TREND")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.secondaryText)
+                    .tracking(0.5)
+                
+                Spacer()
+                
+                if let avg = weeklyAverage() {
+                    Text("Avg: \(String(format: "%.1f", avg))")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.tertiaryText)
+                }
+            }
             
             StrainChartView(weeklyData: viewModel.weeklyChartData.map { ($0.date, $0.value) })
         }
@@ -306,7 +327,7 @@ struct StrainDetailView: View {
     // MARK: - ACWR Card
     private func acwrCard(_ acwr: Double) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("ACUTE:CHRONIC WORKLOAD RATIO")
+            Text("TRAINING LOAD BALANCE")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.secondaryText)
                 .tracking(0.5)
@@ -320,30 +341,109 @@ struct StrainDetailView: View {
                     Text(String(format: "%.2f", acwr))
                         .font(.system(size: 28, weight: .bold))
                         .foregroundColor(.primaryText)
+                    
+                    Text("Acute:Chronic")
+                        .font(.system(size: 10))
+                        .foregroundColor(.tertiaryText)
                 }
                 
                 Spacer()
                 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(viewModel.acwrStatus?.description ?? "Unknown")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.secondaryText)
-                    
                     HStack(spacing: 4) {
                         Image(systemName: acwrStatusIcon())
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                         
                         Text(acwrStatusText())
-                            .font(.system(size: 14, weight: .bold))
+                            .font(.system(size: 16, weight: .bold))
                     }
                     .foregroundColor(acwrStatusColor())
+                    
+                    Text(acwrDescription())
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondaryText)
+                        .multilineTextAlignment(.trailing)
                 }
             }
             
-            Text("Ratio between acute (last 7 days) and chronic (last 28 days) strain. Optimal range: 0.8-1.3")
-                .font(.system(size: 12))
+            // ACWR Progress Bar
+            VStack(spacing: 4) {
+                HStack {
+                    Text("0.8")
+                        .font(.system(size: 9))
+                        .foregroundColor(.tertiaryText)
+                    Spacer()
+                    Text("1.3")
+                        .font(.system(size: 9))
+                        .foregroundColor(.tertiaryText)
+                }
+                
+                ZStack(alignment: .leading) {
+                    // Background
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.secondaryCardBackground)
+                        .frame(height: 8)
+                    
+                    // Optimal zone (0.8-1.3)
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.green.opacity(0.3))
+                        .frame(width: CGFloat((1.3 - 0.8) / 2.0) * 200, height: 8)
+                        .offset(x: CGFloat(0.8 / 2.0) * 200)
+                    
+                    // Current position indicator
+                    Circle()
+                        .fill(acwrStatusColor())
+                        .frame(width: 16, height: 16)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.cardBackground, lineWidth: 2)
+                        )
+                        .offset(x: min(max(CGFloat(acwr / 2.0) * 200 - 8, 0), 192))
+                }
+            }
+            
+            Text("Optimal range: 0.8-1.3. Ratio between acute (7-day) and chronic (28-day) training load. Stay in the green zone to reduce injury risk.")
+                .font(.system(size: 11))
                 .foregroundColor(.tertiaryText)
                 .lineLimit(3)
+        }
+        .padding(20)
+        .background(Color.cardBackground)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 2)
+    }
+    
+    // MARK: - Strain Explanation Card
+    private var strainExplanationCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.accentBlue)
+                
+                Text("HOW STRAIN IS CALCULATED")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.secondaryText)
+                    .tracking(0.5)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                BulletPoint(
+                    text: "Swimming: Heart rate intensity (85%) + pace/calories (15%), with linear duration scaling for endurance work"
+                )
+                
+                BulletPoint(
+                    text: "Strength Training: Intermittent effort modeling accounting for sets/rests, calibrated for 45-90min sessions"
+                )
+                
+                BulletPoint(
+                    text: "Other Activities: Heart rate zones, duration, and caloric burn using logarithmic scaling"
+                )
+                
+                BulletPoint(
+                    text: "All workouts capped at 21 maximum strain (Whoop-aligned scale)"
+                )
+            }
         }
         .padding(20)
         .background(Color.cardBackground)
@@ -355,60 +455,123 @@ struct StrainDetailView: View {
     
     private func strainColor(_ strain: Double) -> Color {
         switch strain {
-        case 0..<9: return Color(red: 0.2, green: 0.8, blue: 0.2)
-        case 9..<14: return Color(red: 0.95, green: 0.7, blue: 0)
+        case 0..<10: return Color(red: 0.2, green: 0.8, blue: 0.2)
+        case 10..<14: return Color(red: 0.95, green: 0.7, blue: 0)
         case 14..<18: return Color(red: 1.0, green: 0.5, blue: 0)
         default: return Color(red: 1.0, green: 0.2, blue: 0.2)
         }
     }
     
-    private func calculateCardiovascularStrain() -> Double {
-        guard !viewModel.workouts.isEmpty else { return 0 }
-        return viewModel.workouts.reduce(0.0) { $0 + ($1.heartRateIntensity ?? 0) }
-    }
-    
-    private func calculateMuscularStrain() -> Double {
-        guard !viewModel.workouts.isEmpty else { return 0 }
-        let totalCalories = viewModel.workouts.reduce(0.0) { $0 + $1.calories }
-        return totalCalories > 0 ? min(totalCalories / 100.0, 10.0) : 0
-    }
-    
-    private func calculateAverageIntensity() -> Double {
+    private func calculateAverageHRIntensity() -> Double {
         guard !viewModel.workouts.isEmpty else { return 0 }
         let totalIntensity = viewModel.workouts.reduce(0.0) { $0 + ($1.heartRateIntensity ?? 0) }
         return totalIntensity / Double(viewModel.workouts.count)
     }
     
+    private func totalWorkoutDuration() -> Double {
+        return viewModel.workouts.reduce(0.0) { $0 + ($1.duration / 60.0) }
+    }
+    
+    private func formatTotalDuration() -> String {
+        let minutes = Int(totalWorkoutDuration())
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+        
+        if hours > 0 {
+            return "\(hours)h \(remainingMinutes)m total"
+        } else {
+            return "\(minutes)m total"
+        }
+    }
+    
+    private func totalCalories() -> Double {
+        return viewModel.workouts.reduce(0.0) { $0 + $1.calories }
+    }
+    
+    private func weeklyAverage() -> Double? {
+        let values = viewModel.weeklyChartData.map { $0.value }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0.0, +) / Double(values.count)
+    }
+    
     private func acwrStatusIcon() -> String {
         guard let status = viewModel.acwrStatus else { return "questionmark.circle" }
         
-        let statusString = status.description.lowercased()
-        if statusString.contains("optimal") || statusString.contains("green") {
+        switch status {
+        case .optimal:
             return "checkmark.circle.fill"
-        } else if statusString.contains("moderate") || statusString.contains("yellow") {
-            return "exclamationmark.circle.fill"
-        } else if statusString.contains("high") || statusString.contains("red") {
-            return "xmark.circle.fill"
+        case .caution:
+            return "exclamationmark.triangle.fill"
+        case .highRisk:
+            return "xmark.octagon.fill"
+        case .undertraining:
+            return "arrow.down.circle.fill"
+        case .unknown:
+            return "questionmark.circle"
+        @unknown default:
+            return "questionmark.circle"
         }
-        return "questionmark.circle"
     }
     
     private func acwrStatusText() -> String {
-        return viewModel.acwrStatus?.description ?? "Unknown"
+        guard let status = viewModel.acwrStatus else { return "Unknown" }
+        return status.description
     }
     
     private func acwrStatusColor() -> Color {
         guard let status = viewModel.acwrStatus else { return .secondaryText }
         
-        let statusString = status.description.lowercased()
-        if statusString.contains("optimal") || statusString.contains("green") {
+        switch status {
+        case .optimal:
             return Color(red: 0.2, green: 0.8, blue: 0.2)
-        } else if statusString.contains("moderate") || statusString.contains("yellow") {
+        case .caution:
             return Color(red: 0.95, green: 0.7, blue: 0)
-        } else if statusString.contains("high") || statusString.contains("red") {
+        case .highRisk:
             return Color(red: 1.0, green: 0.2, blue: 0.2)
+        case .undertraining:
+            return Color(red: 0.4, green: 0.6, blue: 1.0)
+        case .unknown:
+            return .secondaryText
+        @unknown default:
+            return .secondaryText
         }
-        return .secondaryText
+    }
+    
+    private func acwrDescription() -> String {
+        guard let status = viewModel.acwrStatus else { return "" }
+        
+        switch status {
+        case .optimal:
+            return "Optimal training load"
+        case .caution:
+            return "Elevated injury risk"
+        case .highRisk:
+            return "High injury risk"
+        case .undertraining:
+            return "Build intensity gradually"
+        case .unknown:
+            return ""
+        @unknown default:
+            return ""
+        }
+    }
+}
+
+// MARK: - Bullet Point Component
+struct BulletPoint: View {
+    let text: String
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("•")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.accentBlue)
+            
+            Text(text)
+                .font(.system(size: 13))
+                .foregroundColor(.primaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 
@@ -449,13 +612,13 @@ struct StrainGaugeView: View {
     private func strainGaugeColors() -> [Color] {
         let percent = min(strain / 21.0, 1.0)
         
-        if percent < 0.43 {
+        if percent < 0.48 { // 0-10
             return [Color(red: 0.2, green: 0.8, blue: 0.2), Color(red: 0.2, green: 0.8, blue: 0.2)]
-        } else if percent < 0.67 {
+        } else if percent < 0.67 { // 10-14
             return [Color(red: 0.95, green: 0.7, blue: 0), Color(red: 0.95, green: 0.7, blue: 0)]
-        } else if percent < 0.86 {
+        } else if percent < 0.86 { // 14-18
             return [Color(red: 1.0, green: 0.5, blue: 0), Color(red: 1.0, green: 0.5, blue: 0)]
-        } else {
+        } else { // 18-21
             return [Color(red: 1.0, green: 0.2, blue: 0.2), Color(red: 1.0, green: 0.2, blue: 0.2)]
         }
     }
@@ -507,13 +670,6 @@ struct StrainComponentCard: View {
                     .frame(width: max(2, min(CGFloat(percentage / 100.0), 1.0) * 100), alignment: .leading)
             }
             .frame(height: 4)
-            
-            HStack {
-                Spacer()
-                Text(String(format: "%.0f%%", percentage))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.tertiaryText)
-            }
         }
         .padding(12)
         .background(Color.secondaryCardBackground)
@@ -556,6 +712,16 @@ struct WorkoutStrainCard: View {
                             .foregroundColor(.warningOrange)
                         
                         Text("\(Int(workout.calories)) kcal")
+                            .font(.system(size: 12))
+                            .foregroundColor(.secondaryText)
+                    }
+                    
+                    if let avgHR = workout.averageHeartRate {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.red)
+                        
+                        Text("\(Int(avgHR)) bpm")
                             .font(.system(size: 12))
                             .foregroundColor(.secondaryText)
                     }

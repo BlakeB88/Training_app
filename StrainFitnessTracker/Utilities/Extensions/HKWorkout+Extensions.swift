@@ -14,6 +14,11 @@ extension HKWorkout {
         workoutActivityType == .swimBikeRun
     }
     
+    var isStrengthTraining: Bool {
+        workoutActivityType == .traditionalStrengthTraining ||
+        workoutActivityType == .functionalStrengthTraining
+    }
+    
     /// Returns the stroke type for swimming workouts
     var swimmingStrokeStyle: HKWorkoutSwimmingLocationType? {
         guard isSwimming else { return nil }

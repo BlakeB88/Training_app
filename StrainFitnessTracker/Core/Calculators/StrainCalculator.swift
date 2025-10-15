@@ -3,7 +3,7 @@
 //  StrainFitnessTracker
 //
 //  Created by Blake Burnley on 10/7/25.
-//  Updated: 10/9/25 - Aligned strain levels with Whoop (Light: 0-9, Moderate: 10-13, High: 14-17, All Out: 18-21)
+//  Updated: 10/15/25 - Fixed swimming and strength training strain calculations
 //
 
 import Foundation
@@ -48,7 +48,15 @@ struct StrainCalculator {
             )
         }
         
-        // Get workout metrics
+        // Special handling for strength training
+        if workout.isStrengthTraining {
+            return StrengthTrainingStrainCalculator.calculateStrengthTrainingStrain(
+                workout: workout,
+                hrProfile: hrProfile
+            )
+        }
+        
+        // Get workout metrics for other activity types
         let duration = workout.durationMinutes
         let calories = workout.activeCalories
         
@@ -115,7 +123,8 @@ struct StrainCalculator {
         case .rowing:
             return 1.2
         case .functionalStrengthTraining, .traditionalStrengthTraining:
-            return 1.1 // Boosted for muscular load, per Whoop
+            // Should not reach here (handled by StrengthTrainingStrainCalculator)
+            return 1.1
         case .yoga, .flexibility:
             return 0.6 // Lower CV, but some muscular
         case .walking:
