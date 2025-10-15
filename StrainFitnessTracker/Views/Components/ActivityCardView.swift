@@ -1,11 +1,13 @@
 //
-//  ActivityCardView.swift
+//  ActivityCardView.swift (UPDATED with Navigation)
 //  StrainFitnessTracker
 //
-//  Activity item for "Today's Activities" section
+//  Activity card with tap navigation to detail views
+//  Replace existing: StrainFitnessTracker/Views/Components/ActivityCardView.swift
 //
 
 import SwiftUI
+import HealthKit
 
 struct ActivityCardView: View {
     let activity: Activity
@@ -77,6 +79,18 @@ struct ActivityCardView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .onAppear {
+            // Debug: Check what we have
+            if activity.type != .sleep {
+                print("📱 ActivityCard for: \(activity.type.rawValue)")
+                print("   Activity ID: \(activity.id)")
+                print("   Workout in dict: \(workoutDetails[activity.id] != nil ? "YES" : "NO")")
+                if let workout = workoutDetails[activity.id] {
+                    print("   Workout HR: \(workout.averageHeartRate ?? 0)")
+                    print("   Workout Cal: \(workout.calories)")
+                }
+            }
+        }
         .sheet(isPresented: $showDetail) {
             navigationDestination
         }
@@ -90,12 +104,12 @@ struct ActivityCardView: View {
                     sleepStart: activity.startTime,
                     sleepEnd: activity.endTime,
                     sleepDuration: activity.duration / 3600.0,
-                    sleepData: sleepData
+                    sleepData: nil // This should be fetched from your data source
                 )
             }
-        } else if let workout = workoutDetails[activity.id] {
+        } else {
             NavigationStack {
-                WorkoutDetailView(workout: workout)
+                WorkoutDetailView(workout: convertToWorkoutSummary(activity))
             }
         }
     }
@@ -108,4 +122,80 @@ struct ActivityCardView: View {
         default: return Color(red: 1.0, green: 0.2, blue: 0.2)
         }
     }
+    
+    private func convertToWorkoutSummary(_ activity: Activity) -> WorkoutSummary {
+        // Convert Activity to WorkoutSummary
+        // This is a placeholder - you should fetch the actual workout data
+        return WorkoutSummary(
+            id: activity.id,
+            workoutType: activityTypeToHKWorkoutType(activity.type),
+            startDate: activity.startTime,
+            endDate: activity.endTime,
+            duration: activity.duration,
+            distance: nil,
+            calories: 0,
+            averageHeartRate: nil,
+            maxHeartRate: nil,
+            strain: activity.strain ?? 0
+        )
+    }
+    
+    private func activityTypeToHKWorkoutType(_ type: Activity.ActivityType) -> HKWorkoutActivityType {
+        switch type {
+        case .swimming: return .swimming
+        case .running: return .running
+        case .cycling: return .cycling
+        case .workout: return .traditionalStrengthTraining
+        case .walking: return .walking
+        case .sleep: return .other
+        }
+    }
+}
+
+#Preview {
+    VStack(spacing: 12) {
+        // Sleep activity preview
+        ActivityCardView(
+            activity: Activity(
+                type: .sleep,
+                startTime: Date().addingTimeInterval(-28800),
+                endTime: Date(),
+                strain: nil,
+                duration: 28800
+            ),
+            workoutDetails: [:],
+            sleepData: nil
+        )
+        
+        // Workout activity preview
+        ActivityCardView(
+            activity: Activity(
+                type: .swimming,
+                startTime: Date().addingTimeInterval(-7200),
+                endTime: Date().addingTimeInterval(-1800),
+                strain: 10.1,
+                duration: 5400
+            ),
+            workoutDetails: [
+                UUID(): WorkoutSummary(
+                    id: UUID(),
+                    workoutType: .swimming,
+                    startDate: Date().addingTimeInterval(-7200),
+                    endDate: Date().addingTimeInterval(-1800),
+                    duration: 5400,
+                    distance: 3175,
+                    calories: 720,
+                    averageHeartRate: 141,
+                    maxHeartRate: 185,
+                    swimmingStrokeStyle: .freestyle,
+                    lapCount: 127,
+                    strain: 10.1,
+                    heartRateIntensity: 2.5
+                )
+            ],
+            sleepData: nil
+        )
+    }
+    .padding()
+    .background(Color.appBackground)
 }

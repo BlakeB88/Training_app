@@ -20,6 +20,7 @@ class DashboardViewModel: ObservableObject {
     @Published var needsAuthorization: Bool = false
     @Published var workoutDetails: [UUID: WorkoutSummary] = [:]
     @Published var sleepDetails: [UUID: HealthKitManager.SleepData] = [:]
+    @Published var todaysSleepData: HealthKitManager.SleepData?
     
     // MARK: - Dependencies
     private let dataSyncService: DataSyncService
@@ -339,16 +340,20 @@ class DashboardViewModel: ObservableObject {
         // Debug data freshness
         debugStressDataFreshness()
         
+        // ✅ FIXED: Fetch sleep data AFTER updating self.metrics
         if let sleepStart = simpleDailyMetrics.sleepStart,
-            let sleepEnd = simpleDailyMetrics.sleepEnd {
-            do {
-                let sleepData = try await HealthKitManager.shared.fetchDetailedSleepData(
-                    from: sleepStart,
-                    to: sleepEnd
-                )
-                self.todaysSleepData = sleepData
-            } catch {
-                print("Failed to fetch sleep data: \(error)")
+           let sleepEnd = simpleDailyMetrics.sleepEnd {
+            Task { @MainActor in
+                do {
+                    let sleepData = try await HealthKitManager.shared.fetchDetailedSleepData(
+                        from: sleepStart,
+                        to: sleepEnd
+                    )
+                    self.todaysSleepData = sleepData
+                    print("✅ Loaded detailed sleep data")
+                } catch {
+                    print("Failed to fetch sleep data: \(error)")
+                }
             }
         }
     }
@@ -390,23 +395,18 @@ class DashboardViewModel: ObservableObject {
         var allActivities = activities
         if let sleepDuration = simple.sleepDuration,
            sleepDuration > 0,
-           let sleepStart = simple.sleepStart {  // ← Add this condition
+           let sleepStart = simple.sleepStart {
             
-            // Now sleepStart is safely unwrapped
             let sleepEnd = simple.sleepEnd ?? sleepStart.addingTimeInterval(sleepDuration * 3600)
             
             let sleepActivity = Activity(
-                type: .sleep,
-                startTime: sleepStart,  // ← No need for ?? now
-                endTime: sleepEnd,      // ← No need for ?? now
+                type: .sleep,  // Use default initializer for sleep
+                startTime: sleepStart,
+                endTime: sleepEnd,
                 strain: nil,
                 duration: sleepDuration * 3600
             )
             allActivities.insert(sleepActivity, at: 0)
-        }
-        
-        for workout in simple.workouts {
-            workoutDetails[workout.id] = workout
         }
         
         // ✨ Convert stress readings from persisted data
@@ -552,13 +552,24 @@ class DashboardViewModel: ObservableObject {
     
     private func convertWorkoutsToActivities(_ workouts: [WorkoutSummary]) -> [Activity] {
         return workouts.map { workout in
-            Activity(
+            // Create activity with workout's ID so we can map them
+            let activity = Activity(
+                id: workout.id, // Use workout ID
                 type: mapWorkoutType(workout.workoutType),
                 startTime: workout.startDate,
                 endTime: workout.endDate,
                 strain: workout.strain,
                 duration: workout.duration
             )
+            
+            // Store workout details using the same ID
+            workoutDetails[workout.id] = workout
+            
+            // Add this in convertWorkoutsToActivities to debug
+            print("📍 Created activity with ID: \(workout.id)")
+            print("📍 Stored workout: HR=\(workout.averageHeartRate ?? 0), Cal=\(workout.calories)")
+            
+            return activity
         }
     }
     

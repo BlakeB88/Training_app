@@ -25,10 +25,8 @@ struct WorkoutDetailView: View {
                 // Primary metrics cards
                 primaryMetricsSection
                 
-                // Heart rate section
-                if !heartRateData.isEmpty {
-                    heartRateSection
-                }
+                // Heart rate section (show even if loading)
+                heartRateSection
                 
                 // Secondary metrics
                 secondaryMetricsSection
@@ -56,6 +54,15 @@ struct WorkoutDetailView: View {
                         .foregroundColor(.secondaryText)
                 }
             }
+        }
+        .onAppear {
+            // Debug logging
+            print("📊 WorkoutDetailView appeared")
+            print("  Workout ID: \(workout.id)")
+            print("  Average HR: \(workout.averageHeartRate ?? 0)")
+            print("  Max HR: \(workout.maxHeartRate ?? 0)")
+            print("  Calories: \(workout.calories)")
+            print("  Distance: \(workout.distance ?? 0)")
         }
         .task {
             await loadHeartRateData()
