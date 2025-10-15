@@ -294,7 +294,19 @@ struct DashboardView: View {
                     }
                     
                     ForEach(viewModel.metrics.activities) { activity in
-                        ActivityCardView(activity: activity)
+                        if activity.type == .sleep {
+                            ActivityCardView(
+                                activity: activity,
+                                workoutDetails: [:],
+                                sleepData: viewModel.todaysSleepData
+                            )
+                        } else {
+                            ActivityCardView(
+                                activity: activity,
+                                workoutDetails: viewModel.workoutDetails,
+                                sleepData: nil
+                            )
+                        }
                     }
                 }
             } else {
