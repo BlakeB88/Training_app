@@ -83,34 +83,37 @@ struct SimpleBarChartView: View {
     let data: [(date: Date, strain: Double)]
     
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            ForEach(data, id: \.date) { item in
-                VStack(spacing: 4) {
-                    Spacer()
-                    
-                    // Bar with accurate height calculation
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(strainColor(item.strain))
-                        .frame(height: calculateBarHeight(item.strain))
-                    
-                    // Day label
-                    Text(item.date, format: .dateTime.weekday(.narrow))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+        GeometryReader { geometry in
+            HStack(alignment: .bottom, spacing: 8) {
+                ForEach(data, id: \.date) { item in
+                    VStack(spacing: 4) {
+                        Spacer()
+                        
+                        // Bar with accurate height calculation
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(strainColor(item.strain))
+                            .frame(height: calculateBarHeight(item.strain, maxHeight: geometry.size.height - 30))
+                        
+                        // Day label
+                        Text(item.date, format: .dateTime.weekday(.narrow))
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
+            .padding(.vertical, 8)
         }
         .frame(height: 220)
-        .padding(.vertical, 8)
     }
     
     // More accurate bar height calculation
-    private func calculateBarHeight(_ strain: Double) -> CGFloat {
-        let maxHeight: CGFloat = 180
+    private func calculateBarHeight(_ strain: Double, maxHeight: CGFloat) -> CGFloat {
         let maxStrain: CGFloat = 21.0
         
-        // Ensure minimum visible height for very small values
+        // Calculate proportional height
         let calculatedHeight = (CGFloat(strain) / maxStrain) * maxHeight
+        
+        // Ensure minimum visible height for very small values
         return max(calculatedHeight, strain > 0 ? 2 : 0)
     }
     
