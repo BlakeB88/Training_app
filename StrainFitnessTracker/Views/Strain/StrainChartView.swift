@@ -30,10 +30,28 @@ struct StrainChartView: View {
                             y: .value("Strain", data.strain)
                         )
                         .foregroundStyle(strainGradient(data.strain))
+                        .cornerRadius(4)
                     }
                 }
                 .frame(height: 200)
                 .chartYScale(domain: 0...21)
+                .chartYAxis {
+                    AxisMarks(position: .leading, values: [0, 7, 14, 21]) { value in
+                        AxisGridLine()
+                        AxisValueLabel {
+                            if let intValue = value.as(Int.self) {
+                                Text("\(intValue)")
+                                    .font(.caption2)
+                            }
+                        }
+                    }
+                }
+                .chartXAxis {
+                    AxisMarks { value in
+                        AxisValueLabel(format: .dateTime.weekday(.narrow))
+                            .font(.caption2)
+                    }
+                }
             } else {
                 SimpleBarChartView(data: weeklyData)
             }
@@ -67,18 +85,33 @@ struct SimpleBarChartView: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             ForEach(data, id: \.date) { item in
-                VStack {
+                VStack(spacing: 4) {
                     Spacer()
+                    
+                    // Bar with accurate height calculation
                     RoundedRectangle(cornerRadius: 4)
                         .fill(strainColor(item.strain))
-                        .frame(height: CGFloat(item.strain / 21.0) * 180)
+                        .frame(height: calculateBarHeight(item.strain))
                     
+                    // Day label
                     Text(item.date, format: .dateTime.weekday(.narrow))
                         .font(.caption2)
+                        .foregroundColor(.secondary)
                 }
             }
         }
-        .frame(height: 200)
+        .frame(height: 220)
+        .padding(.vertical, 8)
+    }
+    
+    // More accurate bar height calculation
+    private func calculateBarHeight(_ strain: Double) -> CGFloat {
+        let maxHeight: CGFloat = 180
+        let maxStrain: CGFloat = 21.0
+        
+        // Ensure minimum visible height for very small values
+        let calculatedHeight = (CGFloat(strain) / maxStrain) * maxHeight
+        return max(calculatedHeight, strain > 0 ? 2 : 0)
     }
     
     private func strainColor(_ strain: Double) -> Color {
@@ -99,7 +132,7 @@ struct SimpleBarChartView: View {
         (Date().addingTimeInterval(-3*86400), 10.2),
         (Date().addingTimeInterval(-2*86400), 14.8),
         (Date().addingTimeInterval(-1*86400), 11.5),
-        (Date(), 13.2)
+        (Date(), 16.3)
     ])
     .padding()
 }
