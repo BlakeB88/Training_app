@@ -152,6 +152,16 @@ class DashboardViewModel: ObservableObject {
         }
         
         isLoading = false
+        
+        DataSharingManager.shared.saveMetrics(recovery: 75, strain: 45, exertion: 60)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            if let test = DataSharingManager.shared.getLatestMetrics() {
+                print("✅ App Groups WORKING: R=\(test.recoveryPercentage)% S=\(test.strainPercentage)%")
+            } else {
+                print("❌ App Groups NOT WORKING!")
+            }
+        }
     }
     
     /// Refresh all dashboard data (triggers HealthKit sync)
