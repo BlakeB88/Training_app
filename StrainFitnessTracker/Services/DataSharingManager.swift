@@ -1,135 +1,203 @@
 import Foundation
 
-/// Manages data sharing between iOS app, WatchOS app, and complications
+/// Shared data manager for communicating between iPhone app, Watch app, and complications
+/// Must be included in ALL targets: iOS app, Watch app, and Widget extension
 class DataSharingManager {
     static let shared = DataSharingManager()
     
-    private let groupID = "group.com.blake.StrainFitnessTracker"
-    private let recoveryKey = "latestRecovery"
-    private let strainKey = "latestStrain"
-    private let exertionKey = "latestExertion"
-    private let lastUpdateKey = "lastMetricsUpdate"
+    // MARK: - App Group Configuration
+    private let appGroupIdentifier = "group.com.blake.StrainFitnessTracker"
     
-    private var sharedDefaults: UserDefaults? {
-        UserDefaults(suiteName: groupID)
+    // Lazy initialization to avoid repeated warnings
+    private lazy var userDefaults: UserDefaults? = {
+        guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
+            print("❌ Failed to access App Group: \(appGroupIdentifier)")
+            print("   Make sure App Groups capability is enabled for this target")
+            return nil
+        }
+        return defaults
+    }()
+    
+    // MARK: - Storage Keys
+    private enum Keys {
+        static let recovery = "shared_recovery"
+        static let strain = "shared_strain"
+        static let exertion = "shared_exertion"
+        static let lastUpdate = "shared_last_update"
     }
     
-    private init() {}
+    private init() {
+        // Verify App Groups on init
+        #if DEBUG
+        verifyAppGroups()
+        #endif
+    }
     
     // MARK: - Save Methods
     
-    /// Save latest metrics to shared storage
     func saveMetrics(recovery: Double, strain: Double, exertion: Double? = nil) {
-        guard let defaults = sharedDefaults else {
-            print("⚠️ Failed to access shared UserDefaults")
+        guard let defaults = userDefaults else {
+            print("❌ Cannot save metrics - App Group not accessible")
             return
         }
         
-        defaults.set(recovery, forKey: recoveryKey)
-        defaults.set(strain, forKey: strainKey)
+        // Convert to Int percentages for simplicity
+        defaults.set(Int(recovery.rounded()), forKey: Keys.recovery)
+        defaults.set(Int(strain.rounded()), forKey: Keys.strain)
+        
         if let exertion = exertion {
-            defaults.set(exertion, forKey: exertionKey)
+            defaults.set(Int(exertion.rounded()), forKey: Keys.exertion)
         }
-        defaults.set(Date(), forKey: lastUpdateKey)
         
-        print("✅ Saved metrics - Recovery: \(recovery)%, Strain: \(strain)")
+        defaults.set(Date(), forKey: Keys.lastUpdate)
+        
+        // Force synchronize to ensure data is written
+        defaults.synchronize()
+        
+        print("✅ Saved metrics - Recovery: \(Int(recovery))%, Strain: \(Int(strain))%")
     }
     
-    /// Save recovery metric only
     func saveRecovery(_ recovery: Double) {
-        guard let defaults = sharedDefaults else { return }
-        defaults.set(recovery, forKey: recoveryKey)
-        defaults.set(Date(), forKey: lastUpdateKey)
+        guard let defaults = userDefaults else { return }
+        defaults.set(Int(recovery.rounded()), forKey: Keys.recovery)
+        defaults.set(Date(), forKey: Keys.lastUpdate)
+        defaults.synchronize()
     }
     
-    /// Save strain metric only
     func saveStrain(_ strain: Double) {
-        guard let defaults = sharedDefaults else { return }
-        defaults.set(strain, forKey: strainKey)
-        defaults.set(Date(), forKey: lastUpdateKey)
+        guard let defaults = userDefaults else { return }
+        defaults.set(Int(strain.rounded()), forKey: Keys.strain)
+        defaults.set(Date(), forKey: Keys.lastUpdate)
+        defaults.synchronize()
     }
     
-    /// Save exertion metric only
     func saveExertion(_ exertion: Double) {
-        guard let defaults = sharedDefaults else { return }
-        defaults.set(exertion, forKey: exertionKey)
-        defaults.set(Date(), forKey: lastUpdateKey)
+        guard let defaults = userDefaults else { return }
+        defaults.set(Int(exertion.rounded()), forKey: Keys.exertion)
+        defaults.set(Date(), forKey: Keys.lastUpdate)
+        defaults.synchronize()
     }
     
-    // MARK: - Read Methods
+    // MARK: - Retrieve Methods
     
-    /// Get latest metrics from shared storage
     func getLatestMetrics() -> MetricsSnapshot? {
-        guard let defaults = sharedDefaults else { return nil }
-        
-        let recovery = defaults.double(forKey: recoveryKey)
-        let strain = defaults.double(forKey: strainKey)
-        let exertion = defaults.double(forKey: exertionKey)
-        
-        guard let lastUpdate = defaults.object(forKey: lastUpdateKey) as? Date else {
+        guard let defaults = userDefaults else {
+            print("❌ Cannot read metrics - App Group not accessible")
             return nil
         }
         
+        // Check if we have any data
+        guard defaults.object(forKey: Keys.lastUpdate) != nil else {
+            print("⚠️ No metrics data available in App Group")
+            return nil
+        }
+        
+        let recovery = defaults.integer(forKey: Keys.recovery)
+        let strain = defaults.integer(forKey: Keys.strain)
+        let exertion = defaults.integer(forKey: Keys.exertion)
+        let lastUpdate = defaults.object(forKey: Keys.lastUpdate) as? Date ?? Date()
+        
+        let exertionValue = exertion > 0 ? exertion : nil
+        
+        print("📊 Retrieved metrics: R=\(recovery)%, S=\(strain)%, E=\(exertionValue ?? 0)%")
+        
         return MetricsSnapshot(
-            recovery: recovery,
-            strain: strain,
-            exertion: exertion > 0 ? exertion : nil,
+            recoveryPercentage: recovery,
+            strainPercentage: strain,
+            exertionPercentage: exertionValue,
             lastUpdate: lastUpdate
         )
     }
     
-    /// Get recovery value only
-    func getRecovery() -> Double? {
-        guard let defaults = sharedDefaults else { return nil }
-        let value = defaults.double(forKey: recoveryKey)
+    func getRecovery() -> Int? {
+        guard let defaults = userDefaults else { return nil }
+        let value = defaults.integer(forKey: Keys.recovery)
         return value > 0 ? value : nil
     }
     
-    /// Get strain value only
-    func getStrain() -> Double? {
-        guard let defaults = sharedDefaults else { return nil }
-        let value = defaults.double(forKey: strainKey)
+    func getStrain() -> Int? {
+        guard let defaults = userDefaults else { return nil }
+        let value = defaults.integer(forKey: Keys.strain)
         return value > 0 ? value : nil
     }
     
-    /// Get exertion value only
-    func getExertion() -> Double? {
-        guard let defaults = sharedDefaults else { return nil }
-        let value = defaults.double(forKey: exertionKey)
+    func getExertion() -> Int? {
+        guard let defaults = userDefaults else { return nil }
+        let value = defaults.integer(forKey: Keys.exertion)
         return value > 0 ? value : nil
     }
     
-    /// Check if data is stale (older than 2 hours)
     func isDataStale() -> Bool {
-        guard let defaults = sharedDefaults,
-              let lastUpdate = defaults.object(forKey: lastUpdateKey) as? Date else {
+        guard let defaults = userDefaults,
+              let lastUpdate = defaults.object(forKey: Keys.lastUpdate) as? Date else {
             return true
         }
         
         let twoHoursAgo = Date().addingTimeInterval(-2 * 60 * 60)
         return lastUpdate < twoHoursAgo
     }
+    
+    // MARK: - Debug Methods
+    
+    func verifyAppGroups() {
+        print("\n🔍 === APP GROUPS VERIFICATION ===")
+        print("App Group ID: \(appGroupIdentifier)")
+        
+        if let defaults = userDefaults {
+            print("✅ UserDefaults accessible")
+            
+            // Try to write and read a test value
+            let testKey = "test_access"
+            let testValue = "test_\(Date().timeIntervalSince1970)"
+            defaults.set(testValue, forKey: testKey)
+            defaults.synchronize()
+            
+            if let readValue = defaults.string(forKey: testKey), readValue == testValue {
+                print("✅ Read/Write working correctly")
+                defaults.removeObject(forKey: testKey)
+            } else {
+                print("⚠️ Read/Write test failed")
+            }
+            
+            // Check for existing data
+            if let lastUpdate = defaults.object(forKey: Keys.lastUpdate) as? Date {
+                let recovery = defaults.integer(forKey: Keys.recovery)
+                let strain = defaults.integer(forKey: Keys.strain)
+                print("📊 Existing data found:")
+                print("   Recovery: \(recovery)%")
+                print("   Strain: \(strain)%")
+                print("   Last Update: \(lastUpdate)")
+            } else {
+                print("ℹ️ No existing data in App Group")
+            }
+        } else {
+            print("❌ UserDefaults NOT accessible")
+            print("   Verify App Groups capability is enabled")
+            print("   Check that bundle ID matches provisioning profile")
+        }
+        print("==================================\n")
+    }
+    
+    func debugPrint() {
+        verifyAppGroups()
+    }
 }
 
-// MARK: - Models
+// MARK: - Metrics Snapshot Model
 
-/// Snapshot of metrics at a point in time
-struct MetricsSnapshot {
-    let recovery: Double
-    let strain: Double
-    let exertion: Double?
+struct MetricsSnapshot: Codable {
+    let recoveryPercentage: Int
+    let strainPercentage: Int
+    let exertionPercentage: Int?
     let lastUpdate: Date
     
-    var recoveryPercentage: Int {
-        Int(recovery.rounded())
+    var isStale: Bool {
+        Date().timeIntervalSince(lastUpdate) > 3600 // Older than 1 hour
     }
     
-    var strainPercentage: Int {
-        Int(strain.rounded())
-    }
-    
-    var exertionPercentage: Int? {
-        guard let exertion = exertion else { return nil }
-        return Int(exertion.rounded())
+    var formattedLastUpdate: String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: lastUpdate)
     }
 }
