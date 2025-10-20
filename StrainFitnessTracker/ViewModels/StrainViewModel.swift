@@ -9,6 +9,7 @@
 import Foundation
 import Combine
 import HealthKit
+import WidgetKit
 
 @MainActor
 class StrainViewModel: ObservableObject {
@@ -81,6 +82,10 @@ class StrainViewModel: ObservableObject {
         do {
             // Load daily metrics
             dailyMetrics = try repository.fetchDailyMetrics(for: selectedDate)
+            
+            if let metrics = dailyMetrics {
+                DataSharingManager.shared.saveStrain(metrics.strain)
+            }
             
             // Load weekly metrics (7 days)
             let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: selectedDate)!

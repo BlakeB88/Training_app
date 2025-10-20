@@ -8,6 +8,7 @@
 import Foundation
 import Combine
 import HealthKit
+import WidgetKit
 
 @MainActor
 class DashboardViewModel: ObservableObject {
@@ -334,6 +335,8 @@ class DashboardViewModel: ObservableObject {
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
         
         print("✅ Dashboard UI updated with real data")
+        // Trigger widget/complication refresh
+        WidgetCenter.shared.reloadAllTimelines()
         print("  UI Stress History Count: \(self.metrics.stressHistory.count)")
         print("  UI Current Stress: \(self.metrics.currentStress)")
         
@@ -451,6 +454,12 @@ class DashboardViewModel: ObservableObject {
             // Health Monitor
             healthMetricsInRange: calculateMetricsInRange(simple),
             totalHealthMetrics: 5
+        )
+        
+        DataSharingManager.shared.saveMetrics(
+            recovery: simple.recovery ?? 0,
+            strain: simple.strain,
+            exertion: nil // Add exertion if you track it
         )
         
         return metrics
