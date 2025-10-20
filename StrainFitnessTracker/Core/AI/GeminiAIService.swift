@@ -6,10 +6,6 @@ class GeminiAIService {
     // ✅ Prioritize Flash models for better rate limits
     private let modelNames = [
         "gemini-2.5-flash",           // 15 RPM, 250K TPM - BEST for free tier
-        "gemini-flash-latest",        // 15 RPM, 250K TPM
-        "gemini-2.0-flash",           // Good fallback
-        "gemini-2.5-pro",             // Only 2 RPM - AVOID unless necessary
-        "gemini-pro-latest"
     ]
     
     private var workingModel: String?
