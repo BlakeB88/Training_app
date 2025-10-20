@@ -9,11 +9,50 @@
 /* Begin PBXBuildFile section */
 		DA0F40672E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0F40652E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift */; };
 		DA0F40682E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA0F40662E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift */; };
+		DA390EB02EA688F70053EB2F /* StrainFitnessTrackerWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = DA390E902EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		DA390EC32EA6897F0053EB2F /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DA390EC22EA6897F0053EB2F /* WidgetKit.framework */; };
+		DA390EC52EA6897F0053EB2F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DA390EC42EA6897F0053EB2F /* SwiftUI.framework */; };
+		DA390ED22EA689800053EB2F /* StrainComplicationExtensionExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DA390EC02EA6897F0053EB2F /* StrainComplicationExtensionExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		DAE732FD2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE732FA2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift */; };
 		DAE733002E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataClass.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAE732F92E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataClass.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		DA390E9D2EA688F60053EB2F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAE732102E8E1ADD00BA3CA2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA390E8F2EA688F50053EB2F;
+			remoteInfo = "StrainFitnessTrackerWatch Watch App";
+		};
+		DA390EA72EA688F70053EB2F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAE732102E8E1ADD00BA3CA2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA390E8F2EA688F50053EB2F;
+			remoteInfo = "StrainFitnessTrackerWatch Watch App";
+		};
+		DA390ED02EA689800053EB2F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAE732102E8E1ADD00BA3CA2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA390EBF2EA6897F0053EB2F;
+			remoteInfo = StrainComplicationExtensionExtension;
+		};
+		DA58F1052EA691FA00081B73 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAE732102E8E1ADD00BA3CA2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA390E8F2EA688F50053EB2F;
+			remoteInfo = "StrainFitnessTrackerWatch Watch App";
+		};
+		DA58F1072EA691FF00081B73 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DAE732102E8E1ADD00BA3CA2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA390E8F2EA688F50053EB2F;
+			remoteInfo = "StrainFitnessTrackerWatch Watch App";
+		};
 		DAE732262E8E1ADF00BA3CA2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = DAE732102E8E1ADD00BA3CA2 /* Project object */;
@@ -30,9 +69,41 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		DA390EB42EA688F70053EB2F /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				DA390EB02EA688F70053EB2F /* StrainFitnessTrackerWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390ED72EA689800053EB2F /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				DA390ED22EA689800053EB2F /* StrainComplicationExtensionExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		DA0F40652E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutRecordEntity+CoreDataClass.swift"; sourceTree = "<group>"; };
 		DA0F40662E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "WorkoutRecordEntity+CoreDataProperties.swift"; sourceTree = "<group>"; };
+		DA390E902EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "StrainFitnessTrackerWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA390E9C2EA688F60053EB2F /* StrainFitnessTrackerWatch Watch AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "StrainFitnessTrackerWatch Watch AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA390EA62EA688F70053EB2F /* StrainFitnessTrackerWatch Watch AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "StrainFitnessTrackerWatch Watch AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA390EC02EA6897F0053EB2F /* StrainComplicationExtensionExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = StrainComplicationExtensionExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA390EC22EA6897F0053EB2F /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		DA390EC42EA6897F0053EB2F /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		DA390ED82EA689A20053EB2F /* StrainComplicationExtensionExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = StrainComplicationExtensionExtension.entitlements; sourceTree = "<group>"; };
 		DAE732182E8E1ADD00BA3CA2 /* StrainFitnessTracker.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StrainFitnessTracker.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAE732252E8E1ADF00BA3CA2 /* StrainFitnessTrackerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StrainFitnessTrackerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DAE7322F2E8E1ADF00BA3CA2 /* StrainFitnessTrackerUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StrainFitnessTrackerUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -40,25 +111,100 @@
 		DAE732FA2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "DailyMetricsEntity+CoreDataProperties.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		DA390ED32EA689800053EB2F /* Exceptions for "StrainComplicationExtension" folder in "StrainComplicationExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DA390EBF2EA6897F0053EB2F /* StrainComplicationExtensionExtension */;
+		};
+		DA390EDE2EA68A200053EB2F /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTrackerWatch Watch App" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/BaselineMetrics.swift,
+				Models/DailyMetrics.swift,
+				Models/RecoveryComponents.swift,
+				Services/DataSharingManager.swift,
+				Utilities/Colors.swift,
+				Utilities/Constants/AppConstants.swift,
+				"Utilities/Extensions/Date+Extensions.swift",
+				"Utilities/Extensions/Double+Formatting.swift",
+			);
+			target = DA390E8F2EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */;
+		};
+		DA390EDF2EA68A200053EB2F /* Exceptions for "StrainFitnessTracker" folder in "StrainComplicationExtensionExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/BaselineMetrics.swift,
+				Models/DailyMetrics.swift,
+				Models/RecoveryComponents.swift,
+				Services/DataSharingManager.swift,
+				Utilities/Colors.swift,
+				Utilities/Constants/AppConstants.swift,
+				"Utilities/Extensions/Date+Extensions.swift",
+				"Utilities/Extensions/Double+Formatting.swift",
+			);
+			target = DA390EBF2EA6897F0053EB2F /* StrainComplicationExtensionExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		DA390E912EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "StrainFitnessTrackerWatch Watch App";
+			sourceTree = "<group>";
+		};
+		DA390EC62EA6897F0053EB2F /* StrainComplicationExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DA390ED32EA689800053EB2F /* Exceptions for "StrainComplicationExtension" folder in "StrainComplicationExtensionExtension" target */,
+			);
+			path = StrainComplicationExtension;
+			sourceTree = "<group>";
+		};
 		DAE7321A2E8E1ADD00BA3CA2 /* StrainFitnessTracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DA390EDE2EA68A200053EB2F /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTrackerWatch Watch App" target */,
+				DA390EDF2EA68A200053EB2F /* Exceptions for "StrainFitnessTracker" folder in "StrainComplicationExtensionExtension" target */,
+			);
 			path = StrainFitnessTracker;
-			sourceTree = "<group>";
-		};
-		DAE732282E8E1ADF00BA3CA2 /* StrainFitnessTrackerTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = StrainFitnessTrackerTests;
-			sourceTree = "<group>";
-		};
-		DAE732322E8E1ADF00BA3CA2 /* StrainFitnessTrackerUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = StrainFitnessTrackerUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		DA390E8D2EA688F50053EB2F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390E992EA688F60053EB2F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390EA32EA688F70053EB2F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390EBD2EA6897F0053EB2F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DA390EC52EA6897F0053EB2F /* SwiftUI.framework in Frameworks */,
+				DA390EC32EA6897F0053EB2F /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DAE732152E8E1ADD00BA3CA2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -83,16 +229,27 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		DA390EC12EA6897F0053EB2F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				DA390EC22EA6897F0053EB2F /* WidgetKit.framework */,
+				DA390EC42EA6897F0053EB2F /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		DAE7320F2E8E1ADD00BA3CA2 = {
 			isa = PBXGroup;
 			children = (
+				DA390ED82EA689A20053EB2F /* StrainComplicationExtensionExtension.entitlements */,
 				DA0F40652E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataClass.swift */,
 				DA0F40662E95ECD100757CA0 /* WorkoutRecordEntity+CoreDataProperties.swift */,
 				DAE732F92E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataClass.swift */,
 				DAE732FA2E95EAE500BA3CA2 /* DailyMetricsEntity+CoreDataProperties.swift */,
 				DAE7321A2E8E1ADD00BA3CA2 /* StrainFitnessTracker */,
-				DAE732282E8E1ADF00BA3CA2 /* StrainFitnessTrackerTests */,
-				DAE732322E8E1ADF00BA3CA2 /* StrainFitnessTrackerUITests */,
+				DA390E912EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */,
+				DA390EC62EA6897F0053EB2F /* StrainComplicationExtension */,
+				DA390EC12EA6897F0053EB2F /* Frameworks */,
 				DAE732192E8E1ADD00BA3CA2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,6 +260,10 @@
 				DAE732182E8E1ADD00BA3CA2 /* StrainFitnessTracker.app */,
 				DAE732252E8E1ADF00BA3CA2 /* StrainFitnessTrackerTests.xctest */,
 				DAE7322F2E8E1ADF00BA3CA2 /* StrainFitnessTrackerUITests.xctest */,
+				DA390E902EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App.app */,
+				DA390E9C2EA688F60053EB2F /* StrainFitnessTrackerWatch Watch AppTests.xctest */,
+				DA390EA62EA688F70053EB2F /* StrainFitnessTrackerWatch Watch AppUITests.xctest */,
+				DA390EC02EA6897F0053EB2F /* StrainComplicationExtensionExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -110,6 +271,92 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		DA390E8F2EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA390EB12EA688F70053EB2F /* Build configuration list for PBXNativeTarget "StrainFitnessTrackerWatch Watch App" */;
+			buildPhases = (
+				DA390E8C2EA688F50053EB2F /* Sources */,
+				DA390E8D2EA688F50053EB2F /* Frameworks */,
+				DA390E8E2EA688F50053EB2F /* Resources */,
+				DA390ED72EA689800053EB2F /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DA390ED12EA689800053EB2F /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				DA390E912EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */,
+			);
+			name = "StrainFitnessTrackerWatch Watch App";
+			packageProductDependencies = (
+			);
+			productName = "StrainFitnessTrackerWatch Watch App";
+			productReference = DA390E902EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		DA390E9B2EA688F60053EB2F /* StrainFitnessTrackerWatch Watch AppTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA390EB52EA688F70053EB2F /* Build configuration list for PBXNativeTarget "StrainFitnessTrackerWatch Watch AppTests" */;
+			buildPhases = (
+				DA390E982EA688F60053EB2F /* Sources */,
+				DA390E992EA688F60053EB2F /* Frameworks */,
+				DA390E9A2EA688F60053EB2F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DA390E9E2EA688F60053EB2F /* PBXTargetDependency */,
+			);
+			name = "StrainFitnessTrackerWatch Watch AppTests";
+			packageProductDependencies = (
+			);
+			productName = "StrainFitnessTrackerWatch Watch AppTests";
+			productReference = DA390E9C2EA688F60053EB2F /* StrainFitnessTrackerWatch Watch AppTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		DA390EA52EA688F70053EB2F /* StrainFitnessTrackerWatch Watch AppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA390EB82EA688F70053EB2F /* Build configuration list for PBXNativeTarget "StrainFitnessTrackerWatch Watch AppUITests" */;
+			buildPhases = (
+				DA390EA22EA688F70053EB2F /* Sources */,
+				DA390EA32EA688F70053EB2F /* Frameworks */,
+				DA390EA42EA688F70053EB2F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				DA390EA82EA688F70053EB2F /* PBXTargetDependency */,
+			);
+			name = "StrainFitnessTrackerWatch Watch AppUITests";
+			packageProductDependencies = (
+			);
+			productName = "StrainFitnessTrackerWatch Watch AppUITests";
+			productReference = DA390EA62EA688F70053EB2F /* StrainFitnessTrackerWatch Watch AppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		DA390EBF2EA6897F0053EB2F /* StrainComplicationExtensionExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA390ED42EA689800053EB2F /* Build configuration list for PBXNativeTarget "StrainComplicationExtensionExtension" */;
+			buildPhases = (
+				DA390EBC2EA6897F0053EB2F /* Sources */,
+				DA390EBD2EA6897F0053EB2F /* Frameworks */,
+				DA390EBE2EA6897F0053EB2F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DA390EC62EA6897F0053EB2F /* StrainComplicationExtension */,
+			);
+			name = StrainComplicationExtensionExtension;
+			packageProductDependencies = (
+			);
+			productName = StrainComplicationExtensionExtension;
+			productReference = DA390EC02EA6897F0053EB2F /* StrainComplicationExtensionExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		DAE732172E8E1ADD00BA3CA2 /* StrainFitnessTracker */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = DAE732392E8E1ADF00BA3CA2 /* Build configuration list for PBXNativeTarget "StrainFitnessTracker" */;
@@ -117,10 +364,13 @@
 				DAE732142E8E1ADD00BA3CA2 /* Sources */,
 				DAE732152E8E1ADD00BA3CA2 /* Frameworks */,
 				DAE732162E8E1ADD00BA3CA2 /* Resources */,
+				DA390EB42EA688F70053EB2F /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				DA58F1062EA691FA00081B73 /* PBXTargetDependency */,
+				DA58F1082EA691FF00081B73 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				DAE7321A2E8E1ADD00BA3CA2 /* StrainFitnessTracker */,
@@ -145,9 +395,6 @@
 			dependencies = (
 				DAE732272E8E1ADF00BA3CA2 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				DAE732282E8E1ADF00BA3CA2 /* StrainFitnessTrackerTests */,
-			);
 			name = StrainFitnessTrackerTests;
 			packageProductDependencies = (
 			);
@@ -168,9 +415,6 @@
 			dependencies = (
 				DAE732312E8E1ADF00BA3CA2 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				DAE732322E8E1ADF00BA3CA2 /* StrainFitnessTrackerUITests */,
-			);
 			name = StrainFitnessTrackerUITests;
 			packageProductDependencies = (
 			);
@@ -188,6 +432,20 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					DA390E8F2EA688F50053EB2F = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					DA390E9B2EA688F60053EB2F = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = DA390E8F2EA688F50053EB2F;
+					};
+					DA390EA52EA688F70053EB2F = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = DA390E8F2EA688F50053EB2F;
+					};
+					DA390EBF2EA6897F0053EB2F = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
 					DAE732172E8E1ADD00BA3CA2 = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
@@ -218,11 +476,43 @@
 				DAE732172E8E1ADD00BA3CA2 /* StrainFitnessTracker */,
 				DAE732242E8E1ADF00BA3CA2 /* StrainFitnessTrackerTests */,
 				DAE7322E2E8E1ADF00BA3CA2 /* StrainFitnessTrackerUITests */,
+				DA390E8F2EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */,
+				DA390E9B2EA688F60053EB2F /* StrainFitnessTrackerWatch Watch AppTests */,
+				DA390EA52EA688F70053EB2F /* StrainFitnessTrackerWatch Watch AppUITests */,
+				DA390EBF2EA6897F0053EB2F /* StrainComplicationExtensionExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		DA390E8E2EA688F50053EB2F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390E9A2EA688F60053EB2F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390EA42EA688F70053EB2F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390EBE2EA6897F0053EB2F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DAE732162E8E1ADD00BA3CA2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -247,6 +537,34 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		DA390E8C2EA688F50053EB2F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390E982EA688F60053EB2F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390EA22EA688F70053EB2F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA390EBC2EA6897F0053EB2F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DAE732142E8E1ADD00BA3CA2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -275,6 +593,31 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		DA390E9E2EA688F60053EB2F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DA390E8F2EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */;
+			targetProxy = DA390E9D2EA688F60053EB2F /* PBXContainerItemProxy */;
+		};
+		DA390EA82EA688F70053EB2F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DA390E8F2EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */;
+			targetProxy = DA390EA72EA688F70053EB2F /* PBXContainerItemProxy */;
+		};
+		DA390ED12EA689800053EB2F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DA390EBF2EA6897F0053EB2F /* StrainComplicationExtensionExtension */;
+			targetProxy = DA390ED02EA689800053EB2F /* PBXContainerItemProxy */;
+		};
+		DA58F1062EA691FA00081B73 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DA390E8F2EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */;
+			targetProxy = DA58F1052EA691FA00081B73 /* PBXContainerItemProxy */;
+		};
+		DA58F1082EA691FF00081B73 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = DA390E8F2EA688F50053EB2F /* StrainFitnessTrackerWatch Watch App */;
+			targetProxy = DA58F1072EA691FF00081B73 /* PBXContainerItemProxy */;
+		};
 		DAE732272E8E1ADF00BA3CA2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = DAE732172E8E1ADD00BA3CA2 /* StrainFitnessTracker */;
@@ -288,6 +631,240 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		DA390EB22EA688F70053EB2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "StrainFitnessTrackerWatch Watch App/StrainFitnessTrackerWatch Watch App.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GCRP8TZN;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = StrainFitnessTrackerWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.blake.StrainFitnessTracker;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blake.StrainFitnessTracker.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		DA390EB32EA688F70053EB2F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "StrainFitnessTrackerWatch Watch App/StrainFitnessTrackerWatch Watch App.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GCRP8TZN;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = StrainFitnessTrackerWatch;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.blake.StrainFitnessTracker;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blake.StrainFitnessTracker.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		DA390EB62EA688F70053EB2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GCRP8TZN;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.blake.StrainFitnessTracker.StrainFitnessTrackerWatch-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StrainFitnessTrackerWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StrainFitnessTrackerWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		DA390EB72EA688F70053EB2F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GCRP8TZN;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.blake.StrainFitnessTracker.StrainFitnessTrackerWatch-Watch-AppTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/StrainFitnessTrackerWatch Watch App.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/StrainFitnessTrackerWatch Watch App";
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		DA390EB92EA688F70053EB2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GCRP8TZN;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.blake.StrainFitnessTracker.StrainFitnessTrackerWatch-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "StrainFitnessTrackerWatch Watch App";
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		DA390EBA2EA688F70053EB2F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GCRP8TZN;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.blake.StrainFitnessTracker.StrainFitnessTrackerWatch-Watch-AppUITests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				TEST_TARGET_NAME = "StrainFitnessTrackerWatch Watch App";
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		DA390ED52EA689800053EB2F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = StrainComplicationExtensionExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GCRP8TZN;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StrainComplicationExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StrainComplicationExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blake.StrainFitnessTracker.watchkitapp.StrainComplicationExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		DA390ED62EA689800053EB2F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = StrainComplicationExtensionExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 33GCRP8TZN;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StrainComplicationExtension/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = StrainComplicationExtension;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.blake.StrainFitnessTracker.watchkitapp.StrainComplicationExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 		DAE732372E8E1ADF00BA3CA2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -601,6 +1178,42 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		DA390EB12EA688F70053EB2F /* Build configuration list for PBXNativeTarget "StrainFitnessTrackerWatch Watch App" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA390EB22EA688F70053EB2F /* Debug */,
+				DA390EB32EA688F70053EB2F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA390EB52EA688F70053EB2F /* Build configuration list for PBXNativeTarget "StrainFitnessTrackerWatch Watch AppTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA390EB62EA688F70053EB2F /* Debug */,
+				DA390EB72EA688F70053EB2F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA390EB82EA688F70053EB2F /* Build configuration list for PBXNativeTarget "StrainFitnessTrackerWatch Watch AppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA390EB92EA688F70053EB2F /* Debug */,
+				DA390EBA2EA688F70053EB2F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA390ED42EA689800053EB2F /* Build configuration list for PBXNativeTarget "StrainComplicationExtensionExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA390ED52EA689800053EB2F /* Debug */,
+				DA390ED62EA689800053EB2F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		DAE732132E8E1ADD00BA3CA2 /* Build configuration list for PBXProject "StrainFitnessTracker" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import WidgetKit
 
 @MainActor
 class RecoveryViewModel: ObservableObject {
@@ -90,6 +91,10 @@ class RecoveryViewModel: ObservableObject {
         do {
             // Load daily metrics
             dailyMetrics = try repository.fetchDailyMetrics(for: selectedDate)
+            
+            if let metrics = dailyMetrics, let recovery = metrics.recovery {
+                DataSharingManager.shared.saveRecovery(recovery)
+            }
             
             // Load weekly metrics
             let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: selectedDate)!
@@ -252,6 +257,9 @@ class RecoveryViewModel: ObservableObject {
             dailyMetrics = updatedMetrics
             
             print("✅ Recovery recalculated: \(String(format: "%.1f", recovery))")
+            
+            DataSharingManager.shared.saveRecovery(recovery)
+            WidgetCenter.shared.reloadAllTimelines()
             
         } catch {
             errorMessage = "Failed to recalculate recovery: \(error.localizedDescription)"

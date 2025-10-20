@@ -201,14 +201,16 @@ struct StrainDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             }
             
-            // Range bar
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.secondaryCardBackground)
-                
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(strainColor(viewModel.currentStrain))
-                    .frame(width: max(2, min(CGFloat(viewModel.currentStrain / 21.0), 1.0) * 100), alignment: .leading)
+            /// Range bar - FIXED with GeometryReader
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.secondaryCardBackground)
+                    
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(strainColor(viewModel.currentStrain))
+                        .frame(width: max(2, min(CGFloat(viewModel.currentStrain / 21.0), 1.0) * geometry.size.width))
+                }
             }
             .frame(height: 6)
         }
