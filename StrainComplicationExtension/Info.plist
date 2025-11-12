@@ -4,8 +4,15 @@
 <dict>
 	<key>NSExtension</key>
 	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>WKWatchKitAppBundleIdentifier</key>
+			<string>com.blake.StrainFitnessTrackerWatch</string>
+		</dict>
 		<key>NSExtensionPointIdentifier</key>
-		<string>com.apple.widgetkit-extension</string>
+		<string>com.apple.watchkit.complication</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ComplicationController</string>
 	</dict>
 </dict>
 </plist>

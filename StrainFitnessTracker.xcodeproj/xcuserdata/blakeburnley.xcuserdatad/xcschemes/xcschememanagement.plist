@@ -7,17 +7,45 @@
 		<key>StrainComplicationExtensionExtension.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>1</integer>
+			<integer>0</integer>
 		</dict>
 		<key>StrainFitnessTracker.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>0</integer>
+			<integer>2</integer>
 		</dict>
 		<key>StrainFitnessTrackerWatch Watch App.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>2</integer>
+			<integer>1</integer>
+		</dict>
+	</dict>
+	<key>SuppressBuildableAutocreation</key>
+	<dict>
+		<key>DA390E8F2EA688F50053EB2F</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>DA390E9B2EA688F60053EB2F</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>DA390EA52EA688F70053EB2F</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>DA390EBF2EA6897F0053EB2F</key>
+		<dict>
+			<key>primary</key>
+			<true/>
+		</dict>
+		<key>DAE732172E8E1ADD00BA3CA2</key>
+		<dict>
+			<key>primary</key>
+			<true/>
 		</dict>
 	</dict>
 </dict>

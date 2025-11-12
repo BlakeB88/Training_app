@@ -182,7 +182,7 @@ extension HealthMetric {
                           value < baseline ? .down(isPositive: false) : .stable
         
         return HealthMetric(
-            name: "Steps (Beta)",
+            name: "Steps",
             value: "\(value)",
             comparisonValue: "\(baseline)",
             trend: trend,

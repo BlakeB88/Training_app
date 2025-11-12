@@ -147,6 +147,13 @@
 			);
 			target = DA390EBF2EA6897F0053EB2F /* StrainComplicationExtensionExtension */;
 		};
+		DA8A8E572EC5123E00AED79E /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTracker" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DAE732172E8E1ADD00BA3CA2 /* StrainFitnessTracker */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -166,6 +173,7 @@
 		DAE7321A2E8E1ADD00BA3CA2 /* StrainFitnessTracker */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				DA8A8E572EC5123E00AED79E /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTracker" target */,
 				DA390EDE2EA68A200053EB2F /* Exceptions for "StrainFitnessTracker" folder in "StrainFitnessTrackerWatch Watch App" target */,
 				DA390EDF2EA68A200053EB2F /* Exceptions for "StrainFitnessTracker" folder in "StrainComplicationExtensionExtension" target */,
 			);
@@ -993,6 +1001,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StrainFitnessTracker/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Fit Tracker";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "StrainFitnessTracker needs access to your health data to calculate your daily strain from workouts and recovery metrics from sleep, heart rate, and HRV data.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -1042,6 +1051,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = StrainFitnessTracker/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Fit Tracker";
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "StrainFitnessTracker needs access to your health data to calculate your daily strain from workouts and recovery metrics from sleep, heart rate, and HRV data.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
