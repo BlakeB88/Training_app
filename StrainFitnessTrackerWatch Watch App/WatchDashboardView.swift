@@ -3,10 +3,25 @@ import SwiftUI
 struct WatchDashboardView: View {
     @State private var metrics: MetricsSnapshot?
     @State private var isLoading = true
+    @State private var debugInfo: String = ""
     
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // 🔧 DEBUG: Always show debug info at top
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Debug Info")
+                        .font(.caption2)
+                        .foregroundColor(.yellow)
+                    Text(debugInfo)
+                        .font(.system(size: 8))
+                        .foregroundColor(.gray)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(8)
+                .background(Color.black.opacity(0.3))
+                .cornerRadius(8)
+                
                 if let metrics = metrics {
                     // Header
                     VStack(spacing: 4) {
@@ -129,16 +144,55 @@ struct WatchDashboardView: View {
         }
         .navigationTitle("Metrics")
         .onAppear {
+            print("⌚️ [Watch] View appeared")
             loadMetrics()
         }
     }
     
     private func loadMetrics() {
+        print("⌚️ [Watch] Loading metrics...")
         isLoading = true
+        debugInfo = "Loading..."
+        
+        // 🔧 DEBUG: Test App Groups access
+        let groupID = "group.com.blake.StrainFitnessTracker"
+        
+        guard let sharedDefaults = UserDefaults(suiteName: groupID) else {
+            print("❌ [Watch] Failed to access App Group: \(groupID)")
+            debugInfo = "❌ App Group access failed"
+            isLoading = false
+            return
+        }
+        
+        print("✅ [Watch] App Group accessible")
+        debugInfo = "✅ App Group OK\n"
+        
+        // Test read
+        let recovery = sharedDefaults.double(forKey: "latestRecovery")
+        let strain = sharedDefaults.double(forKey: "latestStrain")
+        let lastUpdate = sharedDefaults.object(forKey: "lastMetricsUpdate") as? Date
+        
+        print("📊 [Watch] Read values: R=\(recovery) S=\(strain)")
+        debugInfo += "R=\(Int(recovery)) S=\(Int(strain))\n"
+        
+        if let date = lastUpdate {
+            print("📅 [Watch] Last update: \(date.formatted())")
+            debugInfo += "Last: \(date.formatted(date: .omitted, time: .shortened))"
+        } else {
+            print("⚠️ [Watch] No last update date found")
+            debugInfo += "No update date"
+        }
         
         // Simulate slight delay for loading animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            metrics = DataSharingManager.shared.getLatestMetrics()
+            if let snapshot = DataSharingManager.shared.getLatestMetrics() {
+                print("✅ [Watch] Got metrics snapshot")
+                metrics = snapshot
+                debugInfo = "✅ Data loaded\nR=\(snapshot.recoveryPercentage)% S=\(snapshot.strainPercentage)%"
+            } else {
+                print("⚠️ [Watch] No metrics available")
+                debugInfo = "⚠️ No data in App Group"
+            }
             isLoading = false
         }
     }

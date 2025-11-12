@@ -13,7 +13,11 @@ class GeminiAIService {
     
     // Rate limiting
     private var lastRequestTime: Date?
-    private let minimumRequestInterval: TimeInterval = 4.5 // 4.5 seconds between requests
+    private let minimumRequestInterval: TimeInterval = 5 // 4.5 seconds between requests
+    
+    // ✅ NEW: Retry configuration
+    private let maxRetries = 3
+    private let initialRetryDelay: TimeInterval = 2.0 // Start with 2 seconds
     
     init(apiKey: String) {
         self.apiKey = apiKey
@@ -50,58 +54,81 @@ class GeminiAIService {
         let modelsToTry = workingModel != nil ? [workingModel!] : modelNames
         
         for modelName in modelsToTry {
-            do {
-                let baseURL = getBaseURL(for: modelName)
-                var request = URLRequest(url: URL(string: baseURL + "?key=\(apiKey)")!)
-                request.httpMethod = "POST"
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                
-                request.httpBody = try JSONEncoder().encode(requestBody)
-                
-                let (data, response) = try await session.data(for: request)
-                
-                // Update last request time
-                lastRequestTime = Date()
-                
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    continue
+            // ✅ NEW: Try with retries for rate limits
+            for attempt in 0..<maxRetries {
+                do {
+                    let baseURL = getBaseURL(for: modelName)
+                    var request = URLRequest(url: URL(string: baseURL + "?key=\(apiKey)")!)
+                    request.httpMethod = "POST"
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    
+                    request.httpBody = try JSONEncoder().encode(requestBody)
+                    
+                    let (data, response) = try await session.data(for: request)
+                    
+                    // Update last request time
+                    lastRequestTime = Date()
+                    
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        continue
+                    }
+                    
+                    if httpResponse.statusCode == 200 {
+                        let decodedResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
+                        
+                        guard let content = decodedResponse.candidates.first?.content,
+                              let textPart = content.parts.first?.text else {
+                            throw AIServiceError.invalidResponse
+                        }
+                        
+                        // Save the working model for future requests
+                        workingModel = modelName
+                        print("✅ Using model: \(modelName)")
+                        
+                        return textPart
+                        
+                    } else if httpResponse.statusCode == 404 {
+                        // Model not found, try next one
+                        print("⚠️ Model \(modelName) not found, trying next...")
+                        break // Exit retry loop, try next model
+                        
+                    } else if httpResponse.statusCode == 429 {
+                        // ✅ FIXED: Rate limit hit - retry with exponential backoff
+                        if let errorData = try? JSONDecoder().decode(GeminiErrorResponse.self, from: data) {
+                            print("⚠️ Rate limit hit (attempt \(attempt + 1)/\(maxRetries)): \(errorData.error?.message ?? "Rate limited")")
+                        }
+                        
+                        // If this is our last attempt, throw the error
+                        if attempt == maxRetries - 1 {
+                            throw AIServiceError.rateLimitExceeded("Rate limit exceeded. Please wait a moment and try again.")
+                        }
+                        
+                        // Calculate exponential backoff delay
+                        let delay = initialRetryDelay * pow(2.0, Double(attempt))
+                        print("   ⏳ Waiting \(Int(delay)) seconds before retry...")
+                        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        
+                        // Continue to next retry attempt
+                        continue
+                        
+                    } else {
+                        if let errorData = try? JSONDecoder().decode(GeminiErrorResponse.self, from: data) {
+                            throw AIServiceError.apiError(errorData.error?.message ?? "Unknown error")
+                        }
+                        throw AIServiceError.httpError(httpResponse.statusCode)
+                    }
+                } catch let error as AIServiceError {
+                    // If it's a rate limit error and we have retries left, continue
+                    if case .rateLimitExceeded = error, attempt < maxRetries - 1 {
+                        continue
+                    }
+                    // Otherwise throw the error
+                    throw error
+                } catch {
+                    // Network or other errors - try next model
+                    print("⚠️ Request error: \(error.localizedDescription)")
+                    break // Exit retry loop, try next model
                 }
-                
-                if httpResponse.statusCode == 200 {
-                    let decodedResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
-                    
-                    guard let content = decodedResponse.candidates.first?.content,
-                          let textPart = content.parts.first?.text else {
-                        throw AIServiceError.invalidResponse
-                    }
-                    
-                    // Save the working model for future requests
-                    workingModel = modelName
-                    print("✅ Using model: \(modelName)")
-                    
-                    return textPart
-                } else if httpResponse.statusCode == 404 {
-                    // Model not found, try next one
-                    print("⚠️ Model \(modelName) not found, trying next...")
-                    continue
-                } else if httpResponse.statusCode == 429 {
-                    // Rate limit hit
-                    if let errorData = try? JSONDecoder().decode(GeminiErrorResponse.self, from: data) {
-                        throw AIServiceError.rateLimitExceeded(errorData.error?.message ?? "Rate limit exceeded")
-                    }
-                    throw AIServiceError.rateLimitExceeded("Too many requests. Please wait a moment.")
-                } else {
-                    if let errorData = try? JSONDecoder().decode(GeminiErrorResponse.self, from: data) {
-                        throw AIServiceError.apiError(errorData.error?.message ?? "Unknown error")
-                    }
-                    throw AIServiceError.httpError(httpResponse.statusCode)
-                }
-            } catch let error as AIServiceError {
-                // If it's a definitive error (not 404), throw it
-                throw error
-            } catch {
-                // Try next model
-                continue
             }
         }
         
