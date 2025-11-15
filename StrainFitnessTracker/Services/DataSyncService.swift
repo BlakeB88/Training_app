@@ -653,22 +653,39 @@ class DataSyncService: ObservableObject {
         userDefaults.set(lastSyncDate, forKey: lastSyncKey)
     }
     
-    // MARK: - Baseline Calculation
-    
+    // MARK: - Updated Baseline Calculation with Outlier Filtering
+
     private func calculateBaselinesFromSimpleMetrics(_ metrics: [SimpleDailyMetrics], forDate date: Date) -> BaselineMetrics? {
         guard !metrics.isEmpty else { return nil }
         
         let validMetrics = metrics.filter { $0.hrvAverage != nil && $0.restingHeartRate != nil }
         guard validMetrics.count >= AppConstants.Baseline.minimumDaysForBaseline else { return nil }
         
+        // ✅ NEW: Collect all HRV values and filter outliers
         let hrvValues = validMetrics.compactMap { $0.hrvAverage }
-        let hrvBaseline = hrvValues.isEmpty ? nil : hrvValues.reduce(0.0, +) / Double(hrvValues.count)
-        let hrvStdDev = hrvValues.isEmpty ? nil : standardDeviation(hrvValues)
+        let filteredHRV = HRVOutlierFilter.filterOutliers(hrvValues)
         
+        let hrvBaseline = filteredHRV.isEmpty ? nil : filteredHRV.reduce(0.0, +) / Double(filteredHRV.count)
+        let hrvStdDev = filteredHRV.isEmpty ? nil : standardDeviation(filteredHRV)
+        
+        // Log outlier filtering results
+        if hrvValues.count != filteredHRV.count {
+            let analysis = HRVOutlierFilter.analyzeOutliers(hrvValues)
+            print("  📊 HRV Baseline Outlier Analysis:")
+            print("    Removed: \(analysis.totalOutliers)/\(analysis.totalSamples) (\(String(format: "%.1f", analysis.outlierPercentage))%)")
+            print("    Original avg: \(String(format: "%.1f", analysis.originalAverage)) ms")
+            print("    Filtered avg: \(String(format: "%.1f", analysis.filteredAverage)) ms")
+            print("    Impact: \(String(format: "%.1f", analysis.impactOnAverage))%")
+        }
+        
+        // ✅ NEW: Filter RHR extreme values
         let rhrValues = validMetrics.compactMap { $0.restingHeartRate }
-        let rhrBaseline = rhrValues.isEmpty ? nil : rhrValues.reduce(0.0, +) / Double(rhrValues.count)
-        let rhrStdDev = rhrValues.isEmpty ? nil : standardDeviation(rhrValues)
+        let filteredRHR = rhrValues.filter { $0 >= 35 && $0 <= 120 }
         
+        let rhrBaseline = filteredRHR.isEmpty ? nil : filteredRHR.reduce(0.0, +) / Double(filteredRHR.count)
+        let rhrStdDev = filteredRHR.isEmpty ? nil : standardDeviation(filteredRHR)
+        
+        // Calculate strain baselines (no filtering needed)
         let recentMetrics = metrics.suffix(7)
         let acuteStrain = recentMetrics.isEmpty ? nil : recentMetrics.reduce(0.0) { $0 + $1.strain } / Double(recentMetrics.count)
         let chronicStrain = metrics.isEmpty ? nil : metrics.reduce(0.0) { $0 + $1.strain } / Double(metrics.count)
@@ -685,14 +702,12 @@ class DataSyncService: ObservableObject {
             daysOfData: validMetrics.count
         )
     }
-    
+
     private func standardDeviation(_ values: [Double]) -> Double {
         guard values.count > 1 else { return 0 }
-        
         let mean = values.reduce(0.0, +) / Double(values.count)
         let squaredDifferences = values.map { pow($0 - mean, 2) }
         let variance = squaredDifferences.reduce(0.0, +) / Double(values.count - 1)
-        
         return sqrt(variance)
     }
 }

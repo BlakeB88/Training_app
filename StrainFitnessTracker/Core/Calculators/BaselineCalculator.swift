@@ -2,7 +2,7 @@ import Foundation
 
 struct BaselineCalculator {
     
-    /// Calculate baseline metrics from historical data
+    /// Calculate baseline metrics from historical data with outlier filtering
     static func calculateBaselines(from metrics: [SimpleDailyMetrics], forDate date: Date = Date()) -> BaselineMetrics? {
         let calendar = Calendar.current
         
@@ -16,21 +16,41 @@ struct BaselineCalculator {
             return nil
         }
         
-        // Calculate HRV baseline (7-day average)
+        // ✅ NEW: Collect and filter HRV readings to remove outliers
         let hrvReadings: [Double] = last7Days.compactMap { metric -> Double? in
             guard let hrv = metric.hrvAverage, hrv > 0 else { return nil }
             return hrv
         }
-        let hrvBaseline: Double? = hrvReadings.isEmpty ? nil : hrvReadings.reduce(0, +) / Double(hrvReadings.count)
-        let hrvStdDev: Double? = hrvReadings.isEmpty ? nil : calculateStandardDeviation(hrvReadings)
         
-        // Calculate Resting HR baseline (7-day average)
+        // Apply outlier filtering to HRV
+        let filteredHRV = HRVOutlierFilter.filterOutliers(hrvReadings)
+        
+        let hrvBaseline: Double? = filteredHRV.isEmpty ? nil : filteredHRV.reduce(0, +) / Double(filteredHRV.count)
+        let hrvStdDev: Double? = filteredHRV.isEmpty ? nil : calculateStandardDeviation(filteredHRV)
+        
+        // Log if outliers were removed
+        if hrvReadings.count != filteredHRV.count {
+            let removed = hrvReadings.count - filteredHRV.count
+            let originalAvg = hrvReadings.reduce(0, +) / Double(hrvReadings.count)
+            print("  🔍 HRV Baseline: Filtered \(removed) outliers from \(hrvReadings.count) readings")
+            print("    Original avg: \(String(format: "%.1f", originalAvg)) ms → Filtered avg: \(String(format: "%.1f", hrvBaseline ?? 0)) ms")
+        }
+        
+        // ✅ UPDATED: Filter RHR for extreme values (though less common)
         let rhrReadings: [Double] = last7Days.compactMap { metric -> Double? in
             guard let rhr = metric.restingHeartRate, rhr > 0 else { return nil }
             return rhr
         }
-        let rhrBaseline: Double? = rhrReadings.isEmpty ? nil : rhrReadings.reduce(0, +) / Double(rhrReadings.count)
-        let rhrStdDev: Double? = rhrReadings.isEmpty ? nil : calculateStandardDeviation(rhrReadings)
+        
+        // Apply basic filtering for RHR (remove extreme outliers)
+        let filteredRHR = rhrReadings.filter { $0 >= 35 && $0 <= 120 }
+        
+        let rhrBaseline: Double? = filteredRHR.isEmpty ? nil : filteredRHR.reduce(0, +) / Double(filteredRHR.count)
+        let rhrStdDev: Double? = filteredRHR.isEmpty ? nil : calculateStandardDeviation(filteredRHR)
+        
+        if rhrReadings.count != filteredRHR.count {
+            print("  🔍 RHR Baseline: Filtered \(rhrReadings.count - filteredRHR.count) extreme values")
+        }
         
         // Calculate acute strain (7-day average)
         let acuteStrainValues = last7Days.map { $0.strain }
@@ -65,18 +85,30 @@ struct BaselineCalculator {
         return sqrt(variance)
     }
     
+    /// ✅ NEW: Calculate 7-day average with outlier filtering
     static func calculate7DayAverage(values: [Double]) -> Double? {
         guard !values.isEmpty else { return nil }
         let validValues = values.filter { $0 > 0 }
         guard !validValues.isEmpty else { return nil }
-        return validValues.reduce(0, +) / Double(validValues.count)
+        
+        // Filter outliers before averaging
+        let filtered = HRVOutlierFilter.filterOutliers(validValues)
+        guard !filtered.isEmpty else { return nil }
+        
+        return filtered.reduce(0, +) / Double(filtered.count)
     }
     
+    /// ✅ NEW: Calculate 28-day average with outlier filtering
     static func calculate28DayAverage(values: [Double]) -> Double? {
         guard !values.isEmpty else { return nil }
         let validValues = values.filter { $0 > 0 }
         guard !validValues.isEmpty else { return nil }
-        return validValues.reduce(0, +) / Double(validValues.count)
+        
+        // Filter outliers before averaging
+        let filtered = HRVOutlierFilter.filterOutliers(validValues)
+        guard !filtered.isEmpty else { return nil }
+        
+        return filtered.reduce(0, +) / Double(filtered.count)
     }
     
     static func acwrRiskLevel(acwr: Double) -> ACWRStatus {

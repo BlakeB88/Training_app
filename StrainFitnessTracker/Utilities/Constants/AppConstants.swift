@@ -130,5 +130,5 @@ struct AppConstants {
         static let ringLineWidth: CGFloat = 20.0
     }
     
-    static let geminiAPIKey = "AIzaSyCLjVIiP0ZmwHPWSlMPVA-Q6IKh7QteNAM"
+    static let geminiAPIKey = "AIzaSyCPS5qp4k26TJjg6cLUMC3OgMepR4U4GCQ"
 }
