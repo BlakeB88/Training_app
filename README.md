@@ -9,19 +9,19 @@ Strain Fitness Tracker is a SwiftUI-powered wellness companion that mirrors high
 * Provides async and callback-based authorization helpers so the UI can immediately react to permission changes.
 
 ### Automatic data syncing
-* Schedules quick, full, and targeted sync operations that aggregate workouts, sleep, stress, and strain into a Core Data store. 【F:StrainFitnessTracker/Services/DataSyncService.swift†L52-L170】
-* Refreshes stress data independently so the dashboard stays responsive even when other HealthKit reads are throttled. 【F:StrainFitnessTracker/Services/DataSyncService.swift†L139-L169】
+* Schedules quick, full, and targeted sync operations that aggregate workouts, sleep, stress, and strain into a Core Data store. 
+* Refreshes stress data independently so the dashboard stays responsive even when other HealthKit reads are throttled.
 
 ### Adaptive stress and recovery analytics
 * The main tab experience highlights recovery predictions, stress monitoring, and more screens with a custom tab bar.
 * Stress dashboards visualize live stress history, distribution, and guidance fed by synced HealthKit samples.
 
 ### On-device machine learning
-* Trains a CreateML boosted tree regressor directly on the device using rolling health metrics to predict tomorrow’s recovery. 【F:StrainFitnessTracker/Services/OnDeviceMLTrainer.swift†L14-L200】
+* Trains a CreateML boosted tree regressor directly on the device using rolling health metrics to predict tomorrow’s recovery.
 * Surfaces recovery predictions, contributing factors, and guidance through the `MLPredictionView`.
 
 ### Persistent analytics store
-* Persists aggregated daily metrics, workouts, and stress readings with Core Data for longitudinal insights. 【F:StrainFitnessTracker/Core/Persistence/MetricsRepository.swift†L13-L200】
+* Persists aggregated daily metrics, workouts, and stress readings with Core Data for longitudinal insights.
 
 ## Project structure
 
