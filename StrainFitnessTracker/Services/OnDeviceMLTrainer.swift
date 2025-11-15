@@ -355,17 +355,17 @@ class OnDeviceMLTrainer: ObservableObject {
     /// Load the latest trained model and make a prediction
     func predictTomorrowRecovery() async throws -> RecoveryPrediction {
         print("🔮 Making recovery prediction...")
-        
+
         // 1. Load the model
         guard FileManager.default.fileExists(atPath: compiledModelURL.path) else {
             throw MLTrainingError.modelNotFound
         }
-        
+
         let mlModel = try await MLModel.load(contentsOf: compiledModelURL)
-        
+
         // 2. Get today's features
         let todayFeatures = try await featureService.generateMLMetrics(for: Date())
-        
+
         // 3. Prepare input
         let inputDict: [String: Double] = [
             "sleep_duration": todayFeatures.sleepDuration ?? 8.0,
@@ -374,55 +374,274 @@ class OnDeviceMLTrainer: ObservableObject {
             "sleep_debt": todayFeatures.sleepDebt ?? 0.0,
             "sleep_consistency": todayFeatures.sleepConsistency ?? 80.0,
             "avg_sleep_7d": todayFeatures.avgSleepLast7Days ?? 8.0,
-            
+
             "hrv": todayFeatures.hrvAverage ?? 50.0,
             "hrv_deviation": todayFeatures.hrvDeviation ?? 0.0,
             "rhr": todayFeatures.restingHeartRate ?? 60.0,
             "rhr_deviation": todayFeatures.rhrDeviation ?? 0.0,
             "avg_hrv_7d": todayFeatures.avgHRVLast7Days ?? 50.0,
             "avg_rhr_7d": todayFeatures.avgRHRLast7Days ?? 60.0,
-            
+
             "today_strain": todayFeatures.todayStrain,
             "avg_strain_7d": todayFeatures.avgStrainLast7Days ?? todayFeatures.todayStrain,
             "avg_strain_3d": todayFeatures.avgStrainLast3Days ?? todayFeatures.todayStrain,
             "days_since_rest": Double(todayFeatures.daysSinceRestDay ?? 0),
-            
+
             "avg_stress": todayFeatures.averageStress ?? 0.0,
             "max_stress": todayFeatures.maxStress ?? 0.0,
             "avg_stress_7d": todayFeatures.avgStressLast7Days ?? 0.0,
-            
+
             "avg_recovery_7d": todayFeatures.avgRecoveryLast7Days ?? 70.0,
             "avg_sleep_eff_7d": todayFeatures.avgSleepEfficiencyLast7Days ?? 80.0,
-            
+
             "recovery_trend_3d": todayFeatures.recoveryTrend3Day ?? 0.0,
             "sleep_trend_3d": todayFeatures.sleepTrend3Day ?? 0.0,
             "hrv_trend_3d": todayFeatures.hrvTrend3Day ?? 0.0,
-            
+
             "day_of_week": Double(todayFeatures.dayOfWeek),
             "is_weekend": todayFeatures.isWeekend ? 1.0 : 0.0,
             "is_rest_day": todayFeatures.isRestDay ? 1.0 : 0.0
         ]
-        
+
         // 4. Make prediction
         let provider = try MLDictionaryFeatureProvider(dictionary: inputDict)
         let prediction = try await mlModel.prediction(from: provider)
-        
+
         guard let predictedValue = prediction.featureValue(for: "tomorrow_recovery")?.doubleValue else {
             throw MLTrainingError.predictionFailed
         }
-        
+
         // Clamp to valid range
         let clampedPrediction = min(max(predictedValue, 0), 100)
-        
+
         print("✅ Predicted tomorrow's recovery: \(String(format: "%.1f%%", clampedPrediction))")
-        
+
+        let drivers = generateDrivers(from: todayFeatures)
+
         return RecoveryPrediction(
             predictedRecovery: clampedPrediction,
             confidence: modelAccuracy ?? 0.8,
             modelVersion: modelVersion,
             predictionDate: Date(),
-            inputFeatures: todayFeatures
+            inputFeatures: todayFeatures,
+            drivers: drivers
         )
+    }
+
+    // MARK: - Recovery Insights
+
+    private func generateDrivers(from features: MLDailyMetrics) -> [RecoveryDriver] {
+        var drivers: [RecoveryDriver] = []
+
+        func addDriver(title: String, detail: String, suggestion: String? = nil, impact: Double, icon: String) {
+            let clamped = clampImpact(impact)
+            guard abs(clamped) > 0.05 else { return }
+            drivers.append(
+                RecoveryDriver(
+                    title: title,
+                    detail: detail,
+                    suggestion: suggestion,
+                    impact: clamped,
+                    iconSystemName: icon
+                )
+            )
+        }
+
+        // Sleep duration relative to optimal target
+        if let sleepDuration = features.sleepDuration {
+            let optimalHours = 7.5
+            let delta = sleepDuration - optimalHours
+            if abs(delta) >= 0.25 {
+                let detail = delta >= 0
+                ? "Slept \(formatHours(abs(delta)))h more than the \(formatHours(optimalHours))h target."
+                : "Slept \(formatHours(abs(delta)))h less than the \(formatHours(optimalHours))h target."
+                let suggestion = delta >= 0
+                ? "Keep a similar sleep window to stay charged."
+                : "Aim for about \(formatHours(optimalHours))h tonight to boost recovery."
+                addDriver(
+                    title: "Sleep Duration",
+                    detail: detail,
+                    suggestion: suggestion,
+                    impact: delta / 2.0,
+                    icon: "bed.double.fill"
+                )
+            }
+        }
+
+        // Sleep debt negatively impacts recovery
+        if let sleepDebt = features.sleepDebt, sleepDebt > 0.1 {
+            let detail = "Carrying \(formatHours(sleepDebt))h of sleep debt."
+            let suggestion = "Wind down earlier or schedule a nap to close the gap."
+            addDriver(
+                title: "Sleep Debt",
+                detail: detail,
+                suggestion: suggestion,
+                impact: -sleepDebt / 1.5,
+                icon: "zzz"
+            )
+        }
+
+        // HRV deviation from baseline
+        if let hrvDeviation = features.hrvDeviation {
+            if abs(hrvDeviation) >= 2 {
+                let detail = hrvDeviation >= 0
+                ? "HRV is \(formatPercent(abs(hrvDeviation))) above your 7-day baseline."
+                : "HRV is \(formatPercent(abs(hrvDeviation))) below your 7-day baseline."
+                let suggestion = hrvDeviation >= 0
+                ? "Maintain the habits that boosted HRV."
+                : "Hydrate well and add breathwork to lift HRV."
+                addDriver(
+                    title: "Heart Rate Variability",
+                    detail: detail,
+                    suggestion: suggestion,
+                    impact: hrvDeviation / 18.0,
+                    icon: "waveform.path.ecg"
+                )
+            }
+        } else if let hrvZ = features.hrvZScore, abs(hrvZ) >= 0.25 {
+            let detail = hrvZ >= 0
+            ? "HRV is \(String(format: "%.1f", hrvZ))σ above recent history."
+            : "HRV is \(String(format: "%.1f", abs(hrvZ)))σ below recent history."
+            let suggestion = hrvZ >= 0
+            ? "Maintain the habits that boosted HRV."
+            : "Use mobility work and sleep hygiene to rebound HRV."
+            addDriver(
+                title: "Heart Rate Variability",
+                detail: detail,
+                suggestion: suggestion,
+                impact: hrvZ / 2.5,
+                icon: "waveform.path.ecg"
+            )
+        }
+
+        // Resting heart rate relative to baseline
+        if let rhrDeviation = features.rhrDeviation {
+            if abs(rhrDeviation) >= 1 {
+                let detail = rhrDeviation <= 0
+                ? "Resting HR is \(String(format: "%.1f", abs(rhrDeviation))) bpm below baseline."
+                : "Resting HR is \(String(format: "%.1f", rhrDeviation)) bpm above baseline."
+                let suggestion = rhrDeviation <= 0
+                ? "Easy efforts and quality rest are lowering RHR—nice!"
+                : "Plan lighter training and extra recovery to lower RHR."
+                addDriver(
+                    title: "Resting Heart Rate",
+                    detail: detail,
+                    suggestion: suggestion,
+                    impact: -rhrDeviation / 6.0,
+                    icon: "heart.fill"
+                )
+            }
+        }
+
+        // Training load compared to baseline
+        if let strainBalance = features.strainBalance {
+            if abs(strainBalance) >= 0.25 {
+                let detail = strainBalance <= 0
+                ? "Training load is \(String(format: "%.1f", abs(strainBalance))) below your weekly average."
+                : "Training load is \(String(format: "%.1f", strainBalance)) above your weekly average."
+                let suggestion = strainBalance <= 0
+                ? "Balanced training load is helping you recharge—keep it steady."
+                : "Dial back intensity or add more recovery modalities today."
+                addDriver(
+                    title: "Training Load",
+                    detail: detail,
+                    suggestion: suggestion,
+                    impact: -strainBalance / 3.0,
+                    icon: "figure.strengthtraining.traditional"
+                )
+            }
+        }
+
+        // Stress exposure
+        if let stressLoad = features.stressLoad {
+            let neutralStress = 6.0
+            let delta = stressLoad - neutralStress
+            if abs(delta) >= 0.5 {
+                let detail = delta <= 0
+                ? "Stress load stayed low at \(String(format: "%.1f", stressLoad))."
+                : "Stress load elevated to \(String(format: "%.1f", stressLoad))."
+                let suggestion = delta <= 0
+                ? "Your stress management routine is working—keep it up."
+                : "Block time for mindfulness or light movement to bleed off stress."
+                addDriver(
+                    title: "Stress Load",
+                    detail: detail,
+                    suggestion: suggestion,
+                    impact: -delta / 6.0,
+                    icon: "bolt.heart.fill"
+                )
+            }
+        }
+
+        // Bedtime consistency
+        if let consistency = features.sleepConsistency {
+            let delta = consistency - 80.0
+            if abs(delta) >= 5 {
+                let detail = delta >= 0
+                ? "Sleep schedule consistency at \(formatPercent(consistency)) is helping recovery."
+                : "Sleep schedule consistency at \(formatPercent(consistency)) is hurting recovery."
+                let suggestion = delta >= 0
+                ? "Consistent bedtimes are paying off—stay on rhythm."
+                : "Keep bedtime within a 30 minute window to steady recovery."
+                addDriver(
+                    title: "Sleep Consistency",
+                    detail: detail,
+                    suggestion: suggestion,
+                    impact: delta / 25.0,
+                    icon: "alarm.fill"
+                )
+            }
+        }
+
+        // Recovery relative to baseline
+        if let baselineDelta = features.recoveryBaselineDelta, abs(baselineDelta) >= 3 {
+            let detail = baselineDelta >= 0
+            ? "Today's recovery score is \(String(format: "%.1f", baselineDelta)) above your weekly baseline."
+            : "Today's recovery score is \(String(format: "%.1f", abs(baselineDelta))) below your weekly baseline."
+            let suggestion = baselineDelta >= 0
+            ? "Stay consistent with these habits to keep recovery elevated."
+            : "Use mobility, hydration, and quality sleep to rebound toward baseline."
+            addDriver(
+                title: "Recovery Trend",
+                detail: detail,
+                suggestion: suggestion,
+                impact: baselineDelta / 18.0,
+                icon: "arrow.triangle.2.circlepath"
+            )
+        }
+
+        if drivers.isEmpty {
+            let detail = "Core metrics are tracking close to baseline."
+            drivers.append(
+                RecoveryDriver(
+                    title: "Stable Day",
+                    detail: detail,
+                    suggestion: "Keep the routine rolling—consistency keeps recovery predictable.",
+                    impact: 0.1,
+                    iconSystemName: "calendar"
+                )
+            )
+        }
+
+        return drivers.sorted { abs($0.impact) > abs($1.impact) }
+    }
+
+    private func clampImpact(_ value: Double) -> Double {
+        return max(-1.0, min(1.0, value))
+    }
+
+    private func formatHours(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.maximumFractionDigits = value < 1 ? 2 : 1
+        formatter.minimumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? String(format: "%.1f", value)
+    }
+
+    private func formatPercent(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .percent
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value / 100)) ?? String(format: "%.0f%%", value)
     }
     
     // MARK: - Helper Methods
@@ -469,7 +688,8 @@ struct RecoveryPrediction: Codable {
     let modelVersion: Int
     let predictionDate: Date
     let inputFeatures: MLDailyMetrics
-    
+    let drivers: [RecoveryDriver]
+
     var recoveryLevel: String {
         switch predictedRecovery {
         case 85...100: return "Excellent"
@@ -478,7 +698,7 @@ struct RecoveryPrediction: Codable {
         default: return "Poor"
         }
     }
-    
+
     var recommendation: String {
         switch predictedRecovery {
         case 85...100:
@@ -489,6 +709,42 @@ struct RecoveryPrediction: Codable {
             return "Fair recovery. Consider moderate intensity or skill work."
         default:
             return "Low recovery predicted. Rest day or active recovery recommended."
+        }
+    }
+
+    var topDrivers: [RecoveryDriver] {
+        return drivers.sorted { abs($0.impact) > abs($1.impact) }
+    }
+}
+
+struct RecoveryDriver: Codable, Identifiable {
+    let id: UUID
+    let title: String
+    let detail: String
+    let suggestion: String?
+    let impact: Double // -1 (hurts) ... +1 (helps)
+    let iconSystemName: String
+
+    init(id: UUID = UUID(), title: String, detail: String, suggestion: String? = nil, impact: Double, iconSystemName: String) {
+        self.id = id
+        self.title = title
+        self.detail = detail
+        self.suggestion = suggestion
+        self.impact = impact
+        self.iconSystemName = iconSystemName
+    }
+
+    var isPositive: Bool { impact >= 0 }
+
+    var magnitude: Double { min(1.0, max(0.0, abs(impact))) }
+
+    var emphasisText: String { isPositive ? "Helping" : "Hurting" }
+
+    var strengthDescription: String {
+        switch magnitude {
+        case 0..<0.25: return "Low impact"
+        case 0.25..<0.6: return "Moderate impact"
+        default: return "High impact"
         }
     }
 }
