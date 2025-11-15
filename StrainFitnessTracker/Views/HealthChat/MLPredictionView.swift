@@ -148,6 +148,8 @@ private extension RecoveryPredictionCard {
 
             recommendationTile(p)
 
+            driversSection(p)
+
             factorChips(p)
 
             calibrationRow
@@ -255,6 +257,89 @@ private extension RecoveryPredictionCard {
         .padding()
         .background(Color(.tertiarySystemBackground))
         .cornerRadius(10)
+    }
+}
+
+
+// MARK: Recovery Drivers
+
+private extension RecoveryPredictionCard {
+
+    func driversSection(_ p: RecoveryPrediction) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+
+            Text("Why this score")
+                .font(.headline)
+
+            ForEach(p.topDrivers.prefix(4)) { driver in
+                driverRow(driver)
+            }
+        }
+    }
+
+    func driverRow(_ driver: RecoveryDriver) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+
+            ZStack {
+                Circle()
+                    .fill((driver.isPositive ? Color.green : Color.red).opacity(0.15))
+                    .frame(width: 40, height: 40)
+
+                Image(systemName: driver.iconSystemName)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(driver.isPositive ? .green : .red)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top) {
+                    Text(driver.title)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+
+                    Spacer(minLength: 8)
+
+                    impactBadge(for: driver)
+                }
+
+                Text(driver.detail)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                if let suggestion = driver.suggestion {
+                    Text(suggestion)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+
+                impactMeter(for: driver)
+            }
+        }
+        .padding()
+        .background(Color(.tertiarySystemBackground))
+        .cornerRadius(12)
+    }
+
+    func impactBadge(for driver: RecoveryDriver) -> some View {
+        Text(driver.emphasisText.uppercased())
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .background((driver.isPositive ? Color.green : Color.red).opacity(0.15))
+            .foregroundColor(driver.isPositive ? .green : .red)
+            .cornerRadius(10)
+    }
+
+    func impactMeter(for driver: RecoveryDriver) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ProgressView(value: driver.magnitude)
+                .progressViewStyle(.linear)
+                .tint(driver.isPositive ? .green : .red)
+
+            Text(driver.strengthDescription)
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
     }
 }
 
