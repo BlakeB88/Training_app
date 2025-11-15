@@ -16,6 +16,11 @@ Strain Fitness Tracker is a SwiftUI-powered wellness companion that mirrors high
 * The main tab experience highlights recovery predictions, stress monitoring, and more screens with a custom tab bar.
 * Stress dashboards visualize live stress history, distribution, and guidance fed by synced HealthKit samples.
 
+### Solo Leveling hunter stat sheet
+* A dedicated Hunter tab renders the Solo Leveling–style stat cards, XP bar, global Hunter Rank, and the swim mastery dashboard described in the system design.
+* Stats are calculated with the in-app Hunter stat engine, which merges HealthKit-derived readiness data, body composition inputs, and logarithmic swim rankings.
+* Daily buffs/debuffs, animated rank progress, and the log-based swim event tracker are all surfaced directly in SwiftUI with refreshable data.
+
 ### On-device machine learning
 * Trains a CreateML boosted tree regressor directly on the device using rolling health metrics to predict tomorrow’s recovery.
 * Surfaces recovery predictions, contributing factors, and guidance through the `MLPredictionView`.
@@ -61,3 +66,14 @@ Run the unit and UI test suites from Xcode’s Test navigator. The project ships
 * HealthKit-first fitness analytics with a synchronized Apple Watch experience.
 * On-device Core ML training for personalized recovery forecasting.
 * Robust Core Data persistence that powers dashboards, complications, and watchOS widgets.
+
+## Solo Leveling Hunter Stats (Design Add-On)
+
+The repository now ships with a full design for integrating a Solo Leveling–style hunter stat sheet, XP loop, and logarithmic swim ranking system. The blueprint covers:
+
+* Seven core stat categories powered by body composition, readiness, and swim data
+* Daily buffs/debuffs tied to recovery, strain, and sleep quality
+* Automatic top-three swim event selection with log-based performance indices
+* XP, level, and Hunter Rank progression with Solo Leveling–inspired UI beats
+
+👉 See [`StrainFitnessTracker/Docs/SoloLevelingStats.md`](StrainFitnessTracker/Docs/SoloLevelingStats.md) for the complete system design, data models, and integration steps.
