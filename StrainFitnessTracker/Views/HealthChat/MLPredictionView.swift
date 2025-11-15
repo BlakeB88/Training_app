@@ -2,199 +2,196 @@
 //  MLPredictionView.swift
 //  StrainFitnessTracker
 //
-//  UI for showing ML predictions and model status
+//  Upgraded with full WHOOP-style UI
 //
 
 import SwiftUI
 
-// MARK: - Recovery Prediction Card
+struct MLPredictionView: View {
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                RecoveryPredictionCard()
+            }
+            .padding()
+        }
+        .navigationTitle("AI Recovery Prediction")
+    }
+}
+
+
+// MARK: - Recovery Prediction Card (Upgraded WHOOP-style)
 
 struct RecoveryPredictionCard: View {
+
     @StateObject private var trainer = OnDeviceMLTrainer.shared
     @State private var prediction: RecoveryPrediction?
     @State private var isLoading = false
     @State private var error: String?
-    
+
     var body: some View {
-        VStack(spacing: 16) {
-            // Header
-            HStack {
-                Image(systemName: "brain.head.profile")
-                    .font(.title2)
-                    .foregroundColor(.blue)
-                
-                Text("Tomorrow's Recovery")
-                    .font(.headline)
-                
-                Spacer()
-                
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                }
+
+        VStack(spacing: 20) {
+
+            header
+
+            if isLoading {
+                loadingState
             }
-            
-            if let prediction = prediction {
-                // Prediction display
-                predictionContent(prediction)
-            } else if let error = error {
-                // Error state
-                errorContent(error)
-            } else {
-                // Initial state
-                Button("Predict Tomorrow's Recovery") {
-                    loadPrediction()
-                }
-                .buttonStyle(.borderedProminent)
+            else if let p = prediction {
+                predictionContent(p)
             }
-            
-            // Model info
+            else if let error = error {
+                errorState(error)
+            }
+            else {
+                initialButton
+            }
+
+            Divider().padding(.vertical, 8)
+
             modelInfoFooter()
-            // DEBUG: Force Training Button
-            Button("Force Train Model Now") {
-                Task {
-                    do {
-                        print("🚀 DEBUG: Forcing model training...")
-                        try await OnDeviceMLTrainer.shared.trainModel(force: true)
-                        print("✅ DEBUG: Training complete. Trying prediction...")
-                        loadPrediction()
-                    } catch {
-                        print("❌ DEBUG: Training error:", error.localizedDescription)
-                    }
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .padding(.top, 8)
         }
         .padding()
         .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
+        .cornerRadius(16)
         .onAppear {
             if trainer.hasTrainedModel() {
                 loadPrediction()
             }
         }
     }
-    
-    @ViewBuilder
-    private func predictionContent(_ prediction: RecoveryPrediction) -> some View {
-        VStack(spacing: 12) {
-            // Big recovery number
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(String(format: "%.0f", prediction.predictedRecovery))
-                    .font(.system(size: 64, weight: .bold))
-                    .foregroundColor(recoveryColor(prediction.predictedRecovery))
-                
-                Text("%")
-                    .font(.title)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Recovery level
-            Text(prediction.recoveryLevel)
-                .font(.title3)
-                .fontWeight(.medium)
-                .foregroundColor(.secondary)
-            
-            Divider()
-            
-            // Recommendation
-            HStack {
-                Image(systemName: "lightbulb.fill")
-                    .foregroundColor(.yellow)
-                
-                Text(prediction.recommendation)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                    .multilineTextAlignment(.leading)
-            }
-            .padding()
-            .background(Color(.tertiarySystemBackground))
-            .cornerRadius(8)
-            
-            // Confidence
-            HStack {
-                Text("Confidence:")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                
-                ProgressView(value: prediction.confidence)
-                    .tint(.green)
-                
-                Text("\(Int(prediction.confidence * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+}
+
+
+// MARK: Header
+
+private extension RecoveryPredictionCard {
+
+    var header: some View {
+        HStack {
+            Label("Tomorrow's Recovery", systemImage: "brain.head.profile")
+                .font(.headline)
+
+            Spacer()
+
+            if isLoading {
+                ProgressView().scaleEffect(0.8)
             }
         }
     }
-    
-    @ViewBuilder
-    private func errorContent(_ error: String) -> some View {
+}
+
+
+// MARK: Loading State
+
+private extension RecoveryPredictionCard {
+    var loadingState: some View {
         VStack(spacing: 12) {
+            ProgressView().scaleEffect(1.2)
+            Text("Generating Prediction…")
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 20)
+    }
+}
+
+
+// MARK: Initial Button
+
+private extension RecoveryPredictionCard {
+    var initialButton: some View {
+        Button(action: loadPrediction) {
+            Text("Predict Tomorrow’s Recovery")
+                .padding()
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+    }
+}
+
+
+// MARK: Error State
+
+private extension RecoveryPredictionCard {
+
+    func errorState(_ error: String) -> some View {
+        VStack(spacing: 10) {
+
             Image(systemName: "exclamationmark.triangle")
                 .font(.largeTitle)
                 .foregroundColor(.orange)
-            
+
             Text(error)
-                .font(.subheadline)
-                .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            
-            Button("Try Again") {
-                loadPrediction()
-            }
-            .buttonStyle(.bordered)
+                .foregroundColor(.secondary)
+
+            Button("Try Again", action: loadPrediction)
+                .buttonStyle(.bordered)
         }
-        .padding()
+        .padding(.vertical, 20)
     }
-    
+}
+
+
+// MARK: Prediction Content
+
+private extension RecoveryPredictionCard {
+
     @ViewBuilder
-    private func modelInfoFooter() -> some View {
-        HStack {
-            Image(systemName: "cpu")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            
-            Text("Model v\(trainer.modelVersion)")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            
-            if let accuracy = trainer.modelAccuracy {
-                Text("•")
-                    .foregroundColor(.secondary)
-                
-                Text("\(Int(accuracy * 100))% accurate")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            if let lastTraining = trainer.lastTrainingDate {
-                Text("Updated \(lastTraining, style: .relative)")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
+    func predictionContent(_ p: RecoveryPrediction) -> some View {
+        VStack(spacing: 24) {
+
+            recoveryGauge(p)
+
+            confidenceStrip(p)
+
+            recommendationTile(p)
+
+            factorChips(p)
+
+            calibrationRow
         }
     }
-    
-    private func loadPrediction() {
-        isLoading = true
-        error = nil
-        
-        Task {
-            do {
-                prediction = try await trainer.predictTomorrowRecovery()
-                isLoading = false
-            } catch {
-                self.error = error.localizedDescription
-                isLoading = false
+}
+
+
+// MARK: Recovery Gauge (WHOOP-style)
+
+private extension RecoveryPredictionCard {
+
+    func recoveryGauge(_ p: RecoveryPrediction) -> some View {
+        VStack(spacing: 4) {
+
+            ZStack {
+
+                Circle()
+                    .stroke(Color.gray.opacity(0.15), lineWidth: 12)
+
+                Circle()
+                    .trim(from: 0, to: p.predictedRecovery / 100)
+                    .stroke(
+                        recoveryColor(p.predictedRecovery),
+                        style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeOut, value: p.predictedRecovery)
+
+                VStack {
+                    Text("\(Int(p.predictedRecovery))%")
+                        .font(.system(size: 42, weight: .bold))
+                        .foregroundColor(recoveryColor(p.predictedRecovery))
+
+                    Text(p.recoveryLevel)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
             }
+            .frame(width: 160, height: 160)
         }
     }
-    
-    private func recoveryColor(_ value: Double) -> Color {
+
+    func recoveryColor(_ value: Double) -> Color {
         switch value {
         case 85...100: return .green
         case 70..<85: return .blue
@@ -204,327 +201,165 @@ struct RecoveryPredictionCard: View {
     }
 }
 
-// MARK: - ML Training Status View
 
-struct MLTrainingStatusView: View {
-    @StateObject private var trainer = OnDeviceMLTrainer.shared
-    private let scheduler = MLTrainingScheduler.shared
-    @State private var showingTrainingSheet = false
-    
-    var body: some View {
-        List {
-            Section("Model Status") {
-                HStack {
-                    Label("Model Version", systemImage: "cpu")
-                    Spacer()
-                    Text("v\(trainer.modelVersion)")
-                        .foregroundColor(.secondary)
-                }
-                
-                if let lastTraining = trainer.lastTrainingDate {
-                    HStack {
-                        Label("Last Trained", systemImage: "clock")
-                        Spacer()
-                        Text(lastTraining, style: .relative)
-                            .foregroundColor(.secondary)
-                    }
-                } else {
-                    HStack {
-                        Label("Last Trained", systemImage: "clock")
-                        Spacer()
-                        Text("Never")
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                HStack {
-                    Label("Training Data", systemImage: "chart.bar")
-                    Spacer()
-                    Text("\(trainer.trainingDataCount) days")
-                        .foregroundColor(.secondary)
-                }
-                
-                if let accuracy = trainer.modelAccuracy {
-                    HStack {
-                        Label("Accuracy", systemImage: "target")
-                        Spacer()
-                        Text("\(Int(accuracy * 100))%")
-                            .foregroundColor(accuracyColor(accuracy))
-                            .fontWeight(.medium)
-                    }
+// MARK: Confidence Strip
+
+private extension RecoveryPredictionCard {
+
+    func confidenceStrip(_ p: RecoveryPrediction) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+
+            Text("Confidence Interval")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+
+                    Capsule()
+                        .fill(Color.gray.opacity(0.18))
+
+                    let width = geo.size.width * p.confidence
+
+                    Capsule()
+                        .fill(Color.green.opacity(0.4))
+                        .frame(width: width)
                 }
             }
-            
-            Section("Actions") {
-                Button(action: {
-                    showingTrainingSheet = true
-                }) {
-                    if trainer.isTraining {
-                        HStack {
-                            ProgressView()
-                            Text("Training...")
-                        }
-                    } else {
-                        Label("Train Model Now", systemImage: "brain")
-                    }
-                }
-                .disabled(trainer.isTraining)
-                
-                if trainer.hasTrainedModel() {
-                    NavigationLink {
-                        PredictionDetailView()
-                    } label: {
-                        Label("View Prediction", systemImage: "crystal.ball")
-                    }
-                }
-            }
-            
-            Section("Info") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("About On-Device Learning")
-                        .font(.headline)
-                    
-                    Text("Your recovery model trains automatically each night using your personal health data. The more days you track, the more accurate predictions become.")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 4)
-            }
-        }
-        .navigationTitle("ML Model")
-        .sheet(isPresented: $showingTrainingSheet) {
-            TrainingProgressSheet()
-        }
-    }
-    
-    private func accuracyColor(_ accuracy: Double) -> Color {
-        switch accuracy {
-        case 0.9...1.0: return .green
-        case 0.75..<0.9: return .blue
-        case 0.6..<0.75: return .orange
-        default: return .red
+            .frame(height: 10)
+
+            Text("\(Int(p.confidence * 100))% confidence")
+                .font(.caption2)
+                .foregroundColor(.secondary)
         }
     }
 }
 
-// MARK: - Training Progress Sheet
 
-struct TrainingProgressSheet: View {
-    @StateObject private var trainer = OnDeviceMLTrainer.shared
-    @Environment(\.dismiss) private var dismiss
-    @State private var trainingStarted = false
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 24) {
-                Spacer()
-                
-                // Progress animation
-                ZStack {
-                    Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 8)
-                        .frame(width: 120, height: 120)
-                    
-                    Circle()
-                        .trim(from: 0, to: trainer.trainingProgress)
-                        .stroke(Color.blue, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                        .frame(width: 120, height: 120)
-                        .rotationEffect(.degrees(-90))
-                        .animation(.easeInOut, value: trainer.trainingProgress)
-                    
-                    Image(systemName: "brain")
-                        .font(.system(size: 40))
-                        .foregroundColor(.blue)
-                }
-                
-                VStack(spacing: 8) {
-                    Text(trainingStatusText())
-                        .font(.title3)
-                        .fontWeight(.medium)
-                    
-                    Text("\(Int(trainer.trainingProgress * 100))% Complete")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                
-                if trainer.trainingDataCount > 0 {
-                    Text("Training on \(trainer.trainingDataCount) days of data")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                if !trainer.isTraining && trainingStarted {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
-            }
-            .padding()
-            .navigationTitle("Training Model")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if !trainer.isTraining && !trainingStarted {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                    }
-                }
-            }
-            .onAppear {
-                startTraining()
-            }
+// MARK: Recommendation Tile
+
+private extension RecoveryPredictionCard {
+
+    func recommendationTile(_ p: RecoveryPrediction) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+
+            Image(systemName: "lightbulb.fill")
+                .foregroundColor(.yellow)
+
+            Text(p.recommendation)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+
+            Spacer()
         }
-    }
-    
-    private func startTraining() {
-        trainingStarted = true
-        Task {
-            await MLTrainingScheduler.shared.trainNow()
-        }
-    }
-    
-    private func trainingStatusText() -> String {
-        switch trainer.trainingProgress {
-        case 0..<0.2: return "Collecting data..."
-        case 0.2..<0.4: return "Preparing features..."
-        case 0.4..<0.8: return "Training model..."
-        case 0.8..<1.0: return "Evaluating..."
-        default: return "Complete!"
-        }
+        .padding()
+        .background(Color(.tertiarySystemBackground))
+        .cornerRadius(10)
     }
 }
 
-// MARK: - Prediction Detail View
 
-struct PredictionDetailView: View {
-    @StateObject private var trainer = OnDeviceMLTrainer.shared
-    @State private var prediction: RecoveryPrediction?
-    @State private var isLoading = true
-    
-    var body: some View {
-        Group {
-            if isLoading {
-                ProgressView("Loading prediction...")
-            } else if let prediction = prediction {
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Main prediction
-                        RecoveryPredictionCard()
-                            .padding()
-                        
-                        // Feature importance
-                        featureImportanceSection(prediction)
-                    }
-                }
+// MARK: Key Factor Chips
+
+private extension RecoveryPredictionCard {
+
+    func factorChips(_ p: RecoveryPrediction) -> some View {
+
+        VStack(alignment: .leading, spacing: 8) {
+
+            Text("Key Factors")
+                .font(.headline)
+
+            HStack {
+                factorChip("Sleep", value: p.inputFeatures.sleepDuration, unit: "h")
+                factorChip("HRV", value: p.inputFeatures.hrvAverage, unit: "ms")
+            }
+
+            HStack {
+                factorChip("Strain", value: p.inputFeatures.todayStrain, unit: "")
+                factorChip("Resting HR", value: p.inputFeatures.restingHeartRate, unit: "bpm")
+            }
+        }
+    }
+
+    func factorChip(_ title: String, value: Double?, unit: String) -> some View {
+        VStack(spacing: 4) {
+
+            Text(title)
+                .font(.caption)
+
+            if let value = value {
+                Text("\(String(format: "%.1f", value)) \(unit)")
+                    .font(.headline)
             } else {
-                Text("Unable to load prediction")
+                Text("–")
+                    .font(.headline)
                     .foregroundColor(.secondary)
             }
         }
-        .navigationTitle("Recovery Prediction")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            loadPrediction()
+        .padding(10)
+        .frame(minWidth: 90)
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+    }
+}
+
+
+// MARK: Calibration Indicator
+
+private extension RecoveryPredictionCard {
+    var calibrationRow: some View {
+        HStack {
+            Image(systemName: "tuningfork")
+                .foregroundColor(.blue)
+
+            Text("Model calibrated using last 7 days")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Spacer()
         }
     }
-    
-    @ViewBuilder
-    private func featureImportanceSection(_ prediction: RecoveryPrediction) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Key Factors")
-                .font(.headline)
-                .padding(.horizontal)
-            
-            VStack(spacing: 8) {
-                featureRow("Sleep Duration", value: prediction.inputFeatures.sleepDuration, unit: "h", optimal: 8.0)
-                featureRow("HRV", value: prediction.inputFeatures.hrvAverage, unit: "ms", optimal: 50.0)
-                featureRow("Resting HR", value: prediction.inputFeatures.restingHeartRate, unit: "bpm", optimal: 60.0, inverse: true)
-                featureRow("Strain", value: prediction.inputFeatures.todayStrain, unit: "", optimal: 10.0, inverse: true)
-            }
-            .padding()
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(12)
-            .padding(.horizontal)
+}
+
+
+// MARK: Footer
+
+private extension RecoveryPredictionCard {
+    func modelInfoFooter() -> some View {
+        HStack {
+            Image(systemName: "cpu.fill").foregroundColor(.purple)
+            Text("AI-powered Wellness Engine v1.0")
+                .font(.caption)
+                .foregroundColor(.secondary)
         }
     }
-    
-    @ViewBuilder
-    private func featureRow(_ label: String, value: Double?, unit: String, optimal: Double, inverse: Bool = false) -> some View {
-        if let value = value {
-            HStack {
-                Text(label)
-                    .font(.subheadline)
-                
-                Spacer()
-                
-                Text("\(String(format: "%.1f", value)) \(unit)")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(featureColor(value, optimal: optimal, inverse: inverse))
-            }
-        }
-    }
-    
-    private func featureColor(_ value: Double, optimal: Double, inverse: Bool) -> Color {
-        let ratio = value / optimal
-        
-        if inverse {
-            // Lower is better (like strain, RHR)
-            switch ratio {
-            case 0..<0.9: return .green
-            case 0.9..<1.1: return .blue
-            case 1.1..<1.3: return .orange
-            default: return .red
-            }
-        } else {
-            // Higher is better (like sleep, HRV)
-            switch ratio {
-            case 1.1...: return .green
-            case 0.9..<1.1: return .blue
-            case 0.7..<0.9: return .orange
-            default: return .red
-            }
-        }
-    }
-    
-    private func loadPrediction() {
+}
+
+
+// MARK: Prediction Logic
+
+private extension RecoveryPredictionCard {
+
+    func loadPrediction() {
         Task {
+            isLoading = true
+            error = nil
+
             do {
-                prediction = try await trainer.predictTomorrowRecovery()
-                isLoading = false
+                let pred = try await trainer.predictTomorrowRecovery()
+                prediction = pred
             } catch {
-                print("❌ Failed to load prediction: \(error)")
-                isLoading = false
+                // Use the nice LocalizedError message if available
+                if let mlError = error as? LocalizedError,
+                   let desc = mlError.errorDescription {
+                    self.error = desc
+                } else {
+                    self.error = error.localizedDescription
+                }
             }
+
+            isLoading = false
         }
     }
 }
-
-// MARK: - Preview
-
-struct MLPredictionView_Previews: PreviewProvider {
-    static var previews: some View {
-        NavigationView {
-            RecoveryPredictionCard()
-                .padding()
-        }
-    }
-}
-
-struct MLPredictionView: View {
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                RecoveryPredictionCard()
-                    .padding()
-            }
-            .navigationTitle("Recovery")
-            .navigationBarTitleDisplayMode(.large)
-        }
-    }
-}
-
