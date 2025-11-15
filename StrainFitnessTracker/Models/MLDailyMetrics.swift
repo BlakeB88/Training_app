@@ -91,12 +91,22 @@ struct MLDailyMetrics: Codable, Identifiable {
     var avgRHRLast7Days: Double?
     var avgSleepEfficiencyLast7Days: Double?
     var avgStressLast7Days: Double?
-    
+
     // MARK: - NEW: Recent Trends (3-day)
     var recoveryTrend3Day: Double? // slope of last 3 days
     var sleepTrend3Day: Double?
     var hrvTrend3Day: Double?
-    
+
+    // MARK: - NEW: Derived Balance & Normalization Features
+    var sleepDurationZScore: Double?
+    var hrvZScore: Double?
+    var rhrZScore: Double?
+    var strainBalance: Double?
+    var stressLoad: Double?
+    var recoveryBaselineDelta: Double?
+    var sleepToStrainRatio: Double?
+    var hrvToStrainRatio: Double?
+
     // MARK: - Metadata
     var lastUpdated: Date
     
@@ -192,12 +202,22 @@ struct MLDailyMetrics: Codable, Identifiable {
         avgRHRLast7Days: Double? = nil,
         avgSleepEfficiencyLast7Days: Double? = nil,
         avgStressLast7Days: Double? = nil,
-        
+
         // Trends
         recoveryTrend3Day: Double? = nil,
         sleepTrend3Day: Double? = nil,
         hrvTrend3Day: Double? = nil,
-        
+
+        // Derived balance & normalization
+        sleepDurationZScore: Double? = nil,
+        hrvZScore: Double? = nil,
+        rhrZScore: Double? = nil,
+        strainBalance: Double? = nil,
+        stressLoad: Double? = nil,
+        recoveryBaselineDelta: Double? = nil,
+        sleepToStrainRatio: Double? = nil,
+        hrvToStrainRatio: Double? = nil,
+
         lastUpdated: Date = Date()
     ) {
         self.id = id
@@ -272,12 +292,22 @@ struct MLDailyMetrics: Codable, Identifiable {
         self.avgRHRLast7Days = avgRHRLast7Days
         self.avgSleepEfficiencyLast7Days = avgSleepEfficiencyLast7Days
         self.avgStressLast7Days = avgStressLast7Days
-        
+
         // Trends
         self.recoveryTrend3Day = recoveryTrend3Day
         self.sleepTrend3Day = sleepTrend3Day
         self.hrvTrend3Day = hrvTrend3Day
-        
+
+        // Derived balance & normalization
+        self.sleepDurationZScore = sleepDurationZScore
+        self.hrvZScore = hrvZScore
+        self.rhrZScore = rhrZScore
+        self.strainBalance = strainBalance
+        self.stressLoad = stressLoad
+        self.recoveryBaselineDelta = recoveryBaselineDelta
+        self.sleepToStrainRatio = sleepToStrainRatio
+        self.hrvToStrainRatio = hrvToStrainRatio
+
         self.lastUpdated = lastUpdated
     }
 }

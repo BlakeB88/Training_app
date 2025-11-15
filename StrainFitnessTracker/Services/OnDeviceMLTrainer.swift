@@ -191,7 +191,17 @@ class OnDeviceMLTrainer: ObservableObject {
         dataFrame.append(column: Column(name: "day_of_week", contents: metrics.map { Double($0.dayOfWeek) }))
         dataFrame.append(column: Column(name: "is_weekend", contents: metrics.map { $0.isWeekend ? 1.0 : 0.0 }))
         dataFrame.append(column: Column(name: "is_rest_day", contents: metrics.map { $0.isRestDay ? 1.0 : 0.0 }))
-        
+
+        // Derived balance & normalization features
+        dataFrame.append(column: Column(name: "sleep_duration_zscore", contents: metrics.map { $0.sleepDurationZScore ?? 0.0 }))
+        dataFrame.append(column: Column(name: "hrv_zscore", contents: metrics.map { $0.hrvZScore ?? 0.0 }))
+        dataFrame.append(column: Column(name: "rhr_zscore", contents: metrics.map { $0.rhrZScore ?? 0.0 }))
+        dataFrame.append(column: Column(name: "strain_balance", contents: metrics.map { $0.strainBalance ?? 0.0 }))
+        dataFrame.append(column: Column(name: "stress_load", contents: metrics.map { $0.stressLoad ?? 0.0 }))
+        dataFrame.append(column: Column(name: "recovery_baseline_delta", contents: metrics.map { $0.recoveryBaselineDelta ?? 0.0 }))
+        dataFrame.append(column: Column(name: "sleep_to_strain_ratio", contents: metrics.map { $0.sleepToStrainRatio ?? 0.0 }))
+        dataFrame.append(column: Column(name: "hrv_to_strain_ratio", contents: metrics.map { $0.hrvToStrainRatio ?? 0.0 }))
+
         return dataFrame
     }
     
@@ -280,6 +290,15 @@ class OnDeviceMLTrainer: ObservableObject {
         inputFrame.append(column: Column(name: "day_of_week", contents: [Double(input.dayOfWeek)]))
         inputFrame.append(column: Column(name: "is_weekend", contents: [input.isWeekend ? 1.0 : 0.0]))
         inputFrame.append(column: Column(name: "is_rest_day", contents: [input.isRestDay ? 1.0 : 0.0]))
+
+        inputFrame.append(column: Column(name: "sleep_duration_zscore", contents: [input.sleepDurationZScore ?? 0.0]))
+        inputFrame.append(column: Column(name: "hrv_zscore", contents: [input.hrvZScore ?? 0.0]))
+        inputFrame.append(column: Column(name: "rhr_zscore", contents: [input.rhrZScore ?? 0.0]))
+        inputFrame.append(column: Column(name: "strain_balance", contents: [input.strainBalance ?? 0.0]))
+        inputFrame.append(column: Column(name: "stress_load", contents: [input.stressLoad ?? 0.0]))
+        inputFrame.append(column: Column(name: "recovery_baseline_delta", contents: [input.recoveryBaselineDelta ?? 0.0]))
+        inputFrame.append(column: Column(name: "sleep_to_strain_ratio", contents: [input.sleepToStrainRatio ?? 0.0]))
+        inputFrame.append(column: Column(name: "hrv_to_strain_ratio", contents: [input.hrvToStrainRatio ?? 0.0]))
 
 
         // ---- 1. Predict ----

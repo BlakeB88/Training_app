@@ -53,16 +53,19 @@ class MLFeatureService {
         
         // 8. Add circadian features
         mlMetrics = addCircadianFeatures(to: mlMetrics, historical: historical)
-        
+
         // 9. Add nutrition data
         mlMetrics = await addNutritionFeatures(to: mlMetrics, date: date)
-        
-        // 10. Add tomorrow's recovery if available (target variable)
+
+        // 10. Add derived balance & normalization features
+        mlMetrics = addDerivedBalanceFeatures(to: mlMetrics, historical: historical)
+
+        // 11. Add tomorrow's recovery if available (target variable)
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: date)!
         if let tomorrowMetrics = try? repository.fetchDailyMetrics(for: tomorrow) {
             mlMetrics.tomorrowRecovery = tomorrowMetrics.recovery
         }
-        
+
         print("✅ ML metrics generated successfully")
         return mlMetrics
     }
@@ -296,9 +299,71 @@ class MLFeatureService {
         return updated
     }
 
-    
+    // MARK: - Derived Balance Features
+
+    private func addDerivedBalanceFeatures(to metrics: MLDailyMetrics, historical: [SimpleDailyMetrics]) -> MLDailyMetrics {
+        var updated = metrics
+
+        let last7Days = historical.suffix(8).dropLast()
+
+        // Z-score normalized sleep duration
+        if let sleepDuration = metrics.sleepDuration {
+            let history = last7Days.compactMap { $0.sleepDuration }
+            updated.sleepDurationZScore = calculateZScore(current: sleepDuration, history: history)
+        }
+
+        // Z-score normalized HRV
+        if let hrv = metrics.hrvAverage {
+            let history = last7Days.compactMap { $0.hrvAverage }
+            updated.hrvZScore = calculateZScore(current: hrv, history: history)
+        }
+
+        // Z-score normalized resting heart rate (lower is better)
+        if let rhr = metrics.restingHeartRate {
+            let history = last7Days.compactMap { $0.restingHeartRate }
+            if let zScore = calculateZScore(current: rhr, history: history) {
+                // Invert so higher score still means better recovery readiness
+                updated.rhrZScore = -zScore
+            }
+        }
+
+        // Recovery compared to rolling baseline
+        if let todayRecovery = metrics.todayRecovery, let baseline = metrics.avgRecoveryLast7Days {
+            updated.recoveryBaselineDelta = todayRecovery - baseline
+        }
+
+        // Strain vs baseline
+        if let baseline = metrics.avgStrainLast7Days {
+            updated.strainBalance = metrics.todayStrain - baseline
+        }
+
+        // Sleep vs strain relationship
+        if let sleep = metrics.sleepDuration {
+            let denominator = max(metrics.todayStrain, 1.0)
+            updated.sleepToStrainRatio = sleep / denominator
+        }
+
+        if let hrv = metrics.hrvAverage {
+            let denominator = max(metrics.todayStrain, 1.0)
+            updated.hrvToStrainRatio = hrv / denominator
+        }
+
+        // Composite stress load score
+        if let averageStress = metrics.averageStress {
+            let highStressHours = metrics.timeInHighStress ?? 0
+            let maxStress = metrics.maxStress ?? averageStress
+            let readingCount = Double(metrics.stressReadingCount ?? 0)
+
+            let exposureWeight = max(1.0, readingCount / 4.0)
+            updated.stressLoad = averageStress * (1 + highStressHours) + maxStress * 0.25 + exposureWeight
+        }
+
+        return updated
+    }
+
+
     // MARK: - Helper Methods
-    
+
     private func calculateSlope(_ values: [Double]) -> Double {
         guard values.count >= 2 else { return 0 }
         
@@ -335,6 +400,21 @@ class MLFeatureService {
     
     private func calculateAverageWakeTime(_ times: [Date]) -> Date {
         return calculateAverageBedtime(times) // Same logic
+    }
+
+    private func calculateZScore(current: Double, history: [Double]) -> Double? {
+        guard history.count >= 2 else { return nil }
+
+        let mean = history.reduce(0, +) / Double(history.count)
+        let variance = history.reduce(0) { partial, value in
+            let delta = value - mean
+            return partial + (delta * delta)
+        }
+
+        let standardDeviation = sqrt(variance / Double(history.count))
+        guard standardDeviation > 0 else { return nil }
+
+        return (current - mean) / standardDeviation
     }
 }
 
