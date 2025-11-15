@@ -55,7 +55,7 @@ class MLFeatureService {
         mlMetrics = addCircadianFeatures(to: mlMetrics, historical: historical)
         
         // 9. Add nutrition data
-        mlMetrics = try await addNutritionFeatures(to: mlMetrics, date: date)
+        mlMetrics = await addNutritionFeatures(to: mlMetrics, date: date)
         
         // 10. Add tomorrow's recovery if available (target variable)
         let tomorrow = calendar.date(byAdding: .day, value: 1, to: date)!
@@ -74,10 +74,17 @@ class MLFeatureService {
         let calendar = Calendar.current
         var currentDate = startDate
         
+        var skipped = 0
+
         while currentDate <= endDate {
-            if let mlMetrics = try? await generateMLMetrics(for: currentDate) {
-                allMetrics.append(mlMetrics)
+            do {
+                let metrics = try await generateMLMetrics(for: currentDate)
+                allMetrics.append(metrics)
+            } catch {
+                skipped += 1
+                print("⚠️ Skipping ML metrics for \(currentDate.formatted(.dateTime.month().day())): \(error)")
             }
+
             currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate)!
         }
         
@@ -246,45 +253,49 @@ class MLFeatureService {
     
     // MARK: - Nutrition Features
     
-    private func addNutritionFeatures(to metrics: MLDailyMetrics, date: Date) async throws -> MLDailyMetrics {
+    private func addNutritionFeatures(to metrics: MLDailyMetrics, date: Date) async -> MLDailyMetrics {
         var updated = metrics
-        
+
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: date)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-        
-        // Fetch nutrition data
-        async let caloriesTask = nutritionQuery.fetchCaloriesConsumed(from: startOfDay, to: endOfDay)
-        async let proteinTask = nutritionQuery.fetchProtein(from: startOfDay, to: endOfDay)
-        async let carbsTask = nutritionQuery.fetchCarbohydrates(from: startOfDay, to: endOfDay)
-        async let fatTask = nutritionQuery.fetchFat(from: startOfDay, to: endOfDay)
-        async let waterTask = nutritionQuery.fetchWaterIntake(from: startOfDay, to: endOfDay)
-        async let caffeineTask = nutritionQuery.fetchCaffeine(from: startOfDay, to: endOfDay)
-        async let lastCaffeineTask = nutritionQuery.fetchLastCaffeineTime(for: date)
-        
-        let (calories, protein, carbs, fat, water, caffeine, lastCaffeine) = try await (
-            caloriesTask, proteinTask, carbsTask, fatTask, waterTask, caffeineTask, lastCaffeineTask
-        )
-        
-        updated.caloriesConsumed = calories
-        updated.protein = protein
-        updated.carbohydrates = carbs
-        updated.fat = fat
-        updated.waterIntake = water
-        updated.caffeine = caffeine
-        
-        // Calculate calorie deficit
-        if let consumed = calories, let burned = metrics.activeCalories {
-            updated.calorieDeficit = consumed - burned
+
+        do {
+            async let caloriesTask = nutritionQuery.fetchCaloriesConsumed(from: startOfDay, to: endOfDay)
+            async let proteinTask = nutritionQuery.fetchProtein(from: startOfDay, to: endOfDay)
+            async let carbsTask = nutritionQuery.fetchCarbohydrates(from: startOfDay, to: endOfDay)
+            async let fatTask = nutritionQuery.fetchFat(from: startOfDay, to: endOfDay)
+            async let waterTask = nutritionQuery.fetchWaterIntake(from: startOfDay, to: endOfDay)
+            async let caffeineTask = nutritionQuery.fetchCaffeine(from: startOfDay, to: endOfDay)
+            async let lastCaffeineTask = nutritionQuery.fetchLastCaffeineTime(for: date)
+
+            let (calories, protein, carbs, fat, water, caffeine, lastCaffeine) = try await (
+                caloriesTask, proteinTask, carbsTask, fatTask, waterTask, caffeineTask, lastCaffeineTask
+            )
+
+            updated.caloriesConsumed = calories
+            updated.protein = protein
+            updated.carbohydrates = carbs
+            updated.fat = fat
+            updated.waterIntake = water
+            updated.caffeine = caffeine
+
+            if let consumed = calories, let burned = metrics.activeCalories {
+                updated.calorieDeficit = consumed - burned
+            }
+
+            if let lastCaffeineTime = lastCaffeine {
+                updated.hoursSinceLastCaffeine = Date().timeIntervalSince(lastCaffeineTime) / 3600
+            }
+
+        } catch {
+            print("⚠️ Nutrition features failed for \(date.formatted(.dateTime.month().day())): \(error)")
+            // Continue with nutrition fields empty
         }
-        
-        // Hours since last caffeine
-        if let lastCaffeineTime = lastCaffeine {
-            updated.hoursSinceLastCaffeine = Date().timeIntervalSince(lastCaffeineTime) / 3600
-        }
-        
+
         return updated
     }
+
     
     // MARK: - Helper Methods
     
