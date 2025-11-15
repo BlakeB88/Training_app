@@ -8,6 +8,8 @@
 import Foundation
 import CreateML
 import CoreML
+import Combine
+import TabularData
 
 @MainActor
 class OnDeviceMLTrainer: ObservableObject {
@@ -142,93 +144,78 @@ class OnDeviceMLTrainer: ObservableObject {
     
     // MARK: - CreateML Training
     
-    private func prepareMLDataTable(from metrics: [MLDailyMetrics]) throws -> MLDataTable {
-        // Convert to dictionary format for CreateML
-        var rows: [[String: MLDataValueConvertible]] = []
+    private func prepareMLDataTable(from metrics: [MLDailyMetrics]) throws -> DataFrame {
+        // Create DataFrame columns
+        var dataFrame = DataFrame()
         
-        for metric in metrics {
-            var row: [String: MLDataValueConvertible] = [:]
-            
-            // Target variable
-            row["tomorrow_recovery"] = metric.tomorrowRecovery ?? 0.0
-            
-            // Sleep features
-            row["sleep_duration"] = metric.sleepDuration ?? 0.0
-            row["sleep_efficiency"] = metric.sleepEfficiency ?? 0.0
-            row["restorative_sleep_pct"] = metric.restorativeSleepPercentage ?? 0.0
-            row["sleep_debt"] = metric.sleepDebt ?? 0.0
-            row["sleep_consistency"] = metric.sleepConsistency ?? 0.0
-            row["avg_sleep_7d"] = metric.avgSleepLast7Days ?? metric.sleepDuration ?? 8.0
-            
-            // Physiological features
-            row["hrv"] = metric.hrvAverage ?? 0.0
-            row["hrv_deviation"] = metric.hrvDeviation ?? 0.0
-            row["rhr"] = metric.restingHeartRate ?? 60.0
-            row["rhr_deviation"] = metric.rhrDeviation ?? 0.0
-            row["avg_hrv_7d"] = metric.avgHRVLast7Days ?? metric.hrvAverage ?? 0.0
-            row["avg_rhr_7d"] = metric.avgRHRLast7Days ?? metric.restingHeartRate ?? 60.0
-            
-            // Strain features
-            row["today_strain"] = metric.todayStrain
-            row["avg_strain_7d"] = metric.avgStrainLast7Days ?? metric.todayStrain
-            row["avg_strain_3d"] = metric.avgStrainLast3Days ?? metric.todayStrain
-            row["days_since_rest"] = Double(metric.daysSinceRestDay ?? 0)
-            
-            // Stress features
-            row["avg_stress"] = metric.averageStress ?? 0.0
-            row["max_stress"] = metric.maxStress ?? 0.0
-            row["avg_stress_7d"] = metric.avgStressLast7Days ?? metric.averageStress ?? 0.0
-            
-            // Rolling averages
-            row["avg_recovery_7d"] = metric.avgRecoveryLast7Days ?? metric.todayRecovery ?? 70.0
-            row["avg_sleep_eff_7d"] = metric.avgSleepEfficiencyLast7Days ?? metric.sleepEfficiency ?? 80.0
-            
-            // Trends (with fallback to 0 if nil)
-            row["recovery_trend_3d"] = metric.recoveryTrend3Day ?? 0.0
-            row["sleep_trend_3d"] = metric.sleepTrend3Day ?? 0.0
-            row["hrv_trend_3d"] = metric.hrvTrend3Day ?? 0.0
-            
-            // Environmental
-            row["day_of_week"] = Double(metric.dayOfWeek)
-            row["is_weekend"] = metric.isWeekend ? 1.0 : 0.0
-            row["is_rest_day"] = metric.isRestDay ? 1.0 : 0.0
-            
-            rows.append(row)
-        }
+        // Target variable
+        dataFrame.append(column: Column(name: "tomorrow_recovery", contents: metrics.map { $0.tomorrowRecovery ?? 0.0 }))
         
-        return try MLDataTable(dictionary: Dictionary(uniqueKeysWithValues: rows[0].keys.map { key in
-            (key, rows.map { $0[key]! })
-        }))
+        // Sleep features
+        dataFrame.append(column: Column(name: "sleep_duration", contents: metrics.map { $0.sleepDuration ?? 0.0 }))
+        dataFrame.append(column: Column(name: "sleep_efficiency", contents: metrics.map { $0.sleepEfficiency ?? 0.0 }))
+        dataFrame.append(column: Column(name: "restorative_sleep_pct", contents: metrics.map { $0.restorativeSleepPercentage ?? 0.0 }))
+        dataFrame.append(column: Column(name: "sleep_debt", contents: metrics.map { $0.sleepDebt ?? 0.0 }))
+        dataFrame.append(column: Column(name: "sleep_consistency", contents: metrics.map { $0.sleepConsistency ?? 0.0 }))
+        dataFrame.append(column: Column(name: "avg_sleep_7d", contents: metrics.map { $0.avgSleepLast7Days ?? $0.sleepDuration ?? 8.0 }))
+        
+        // Physiological features
+        dataFrame.append(column: Column(name: "hrv", contents: metrics.map { $0.hrvAverage ?? 0.0 }))
+        dataFrame.append(column: Column(name: "hrv_deviation", contents: metrics.map { $0.hrvDeviation ?? 0.0 }))
+        dataFrame.append(column: Column(name: "rhr", contents: metrics.map { $0.restingHeartRate ?? 60.0 }))
+        dataFrame.append(column: Column(name: "rhr_deviation", contents: metrics.map { $0.rhrDeviation ?? 0.0 }))
+        dataFrame.append(column: Column(name: "avg_hrv_7d", contents: metrics.map { $0.avgHRVLast7Days ?? $0.hrvAverage ?? 0.0 }))
+        dataFrame.append(column: Column(name: "avg_rhr_7d", contents: metrics.map { $0.avgRHRLast7Days ?? $0.restingHeartRate ?? 60.0 }))
+        
+        // Strain features
+        dataFrame.append(column: Column(name: "today_strain", contents: metrics.map { $0.todayStrain }))
+        dataFrame.append(column: Column(name: "avg_strain_7d", contents: metrics.map { $0.avgStrainLast7Days ?? $0.todayStrain }))
+        dataFrame.append(column: Column(name: "avg_strain_3d", contents: metrics.map { $0.avgStrainLast3Days ?? $0.todayStrain }))
+        dataFrame.append(column: Column(name: "days_since_rest", contents: metrics.map { Double($0.daysSinceRestDay ?? 0) }))
+        
+        // Stress features
+        dataFrame.append(column: Column(name: "avg_stress", contents: metrics.map { $0.averageStress ?? 0.0 }))
+        dataFrame.append(column: Column(name: "max_stress", contents: metrics.map { $0.maxStress ?? 0.0 }))
+        dataFrame.append(column: Column(name: "avg_stress_7d", contents: metrics.map { $0.avgStressLast7Days ?? $0.averageStress ?? 0.0 }))
+        
+        // Rolling averages
+        dataFrame.append(column: Column(name: "avg_recovery_7d", contents: metrics.map { $0.avgRecoveryLast7Days ?? $0.todayRecovery ?? 70.0 }))
+        dataFrame.append(column: Column(name: "avg_sleep_eff_7d", contents: metrics.map { $0.avgSleepEfficiencyLast7Days ?? $0.sleepEfficiency ?? 80.0 }))
+        
+        // Trends
+        dataFrame.append(column: Column(name: "recovery_trend_3d", contents: metrics.map { $0.recoveryTrend3Day ?? 0.0 }))
+        dataFrame.append(column: Column(name: "sleep_trend_3d", contents: metrics.map { $0.sleepTrend3Day ?? 0.0 }))
+        dataFrame.append(column: Column(name: "hrv_trend_3d", contents: metrics.map { $0.hrvTrend3Day ?? 0.0 }))
+        
+        // Environmental
+        dataFrame.append(column: Column(name: "day_of_week", contents: metrics.map { Double($0.dayOfWeek) }))
+        dataFrame.append(column: Column(name: "is_weekend", contents: metrics.map { $0.isWeekend ? 1.0 : 0.0 }))
+        dataFrame.append(column: Column(name: "is_rest_day", contents: metrics.map { $0.isRestDay ? 1.0 : 0.0 }))
+        
+        return dataFrame
     }
     
-    private func trainCreateMLModel(data: MLDataTable) async throws -> MLRegressor {
-        print("  🎯 Training boosted tree regressor...")
-        
-        // Split data: 80% train, 20% validation
-        let (trainingData, validationData) = data.randomSplit(by: 0.8)
-        
-        // Train a Boosted Tree Regressor (works well for tabular data)
-        let regressor = try MLBoostedTreeRegressor(
-            trainingData: trainingData,
-            targetColumn: "tomorrow_recovery",
-            featureColumns: nil, // Use all columns except target
-            maxIterations: 100,
-            validationData: validationData
-        )
-        
-        // Get training metrics
-        let trainingError = regressor.trainingMetrics.rootMeanSquaredError
-        let validationError = regressor.validationMetrics.rootMeanSquaredError
-        
-        print("  📊 Training RMSE: \(String(format: "%.2f", trainingError))")
-        print("  📊 Validation RMSE: \(String(format: "%.2f", validationError))")
-        
-        return regressor
-    }
+    private func trainCreateMLModel(data: DataFrame) async throws -> MLBoostedTreeRegressor {
+            print("  🎯 Training boosted tree regressor...")
+
+            // MLBoostedTreeRegressor automatically uses 20% of data for validation
+            let regressor = try MLBoostedTreeRegressor(
+                trainingData: data,
+                targetColumn: "tomorrow_recovery"
+            )
+
+            let trainingError = regressor.trainingMetrics.rootMeanSquaredError
+            let validationError = regressor.validationMetrics.rootMeanSquaredError
+
+            print("  📊 Training RMSE: \(String(format: "%.2f", trainingError))")
+            print("  📊 Validation RMSE: \(String(format: "%.2f", validationError))")
+
+            return regressor
+        }
     
     // MARK: - Model Evaluation
     
-    private func evaluateModel(_ model: MLRegressor, on data: [MLDailyMetrics]) -> Double {
+    private func evaluateModel(_ model: MLBoostedTreeRegressor, on data: [MLDailyMetrics]) -> Double {
         var totalError: Double = 0.0
         var validPredictions = 0
         
@@ -255,72 +242,93 @@ class OnDeviceMLTrainer: ObservableObject {
         return accuracy
     }
     
-    private func makePrediction(model: MLRegressor, input: MLDailyMetrics) throws -> Double {
-        let inputDict: [String: Double] = [
-            "sleep_duration": input.sleepDuration ?? 8.0,
-            "sleep_efficiency": input.sleepEfficiency ?? 80.0,
-            "restorative_sleep_pct": input.restorativeSleepPercentage ?? 30.0,
-            "sleep_debt": input.sleepDebt ?? 0.0,
-            "sleep_consistency": input.sleepConsistency ?? 80.0,
-            "avg_sleep_7d": input.avgSleepLast7Days ?? 8.0,
-            
-            "hrv": input.hrvAverage ?? 50.0,
-            "hrv_deviation": input.hrvDeviation ?? 0.0,
-            "rhr": input.restingHeartRate ?? 60.0,
-            "rhr_deviation": input.rhrDeviation ?? 0.0,
-            "avg_hrv_7d": input.avgHRVLast7Days ?? 50.0,
-            "avg_rhr_7d": input.avgRHRLast7Days ?? 60.0,
-            
-            "today_strain": input.todayStrain,
-            "avg_strain_7d": input.avgStrainLast7Days ?? input.todayStrain,
-            "avg_strain_3d": input.avgStrainLast3Days ?? input.todayStrain,
-            "days_since_rest": Double(input.daysSinceRestDay ?? 0),
-            
-            "avg_stress": input.averageStress ?? 0.0,
-            "max_stress": input.maxStress ?? 0.0,
-            "avg_stress_7d": input.avgStressLast7Days ?? 0.0,
-            
-            "avg_recovery_7d": input.avgRecoveryLast7Days ?? 70.0,
-            "avg_sleep_eff_7d": input.avgSleepEfficiencyLast7Days ?? 80.0,
-            
-            "recovery_trend_3d": input.recoveryTrend3Day ?? 0.0,
-            "sleep_trend_3d": input.sleepTrend3Day ?? 0.0,
-            "hrv_trend_3d": input.hrvTrend3Day ?? 0.0,
-            
-            "day_of_week": Double(input.dayOfWeek),
-            "is_weekend": input.isWeekend ? 1.0 : 0.0,
-            "is_rest_day": input.isRestDay ? 1.0 : 0.0
-        ]
+    private func makePrediction(model: MLBoostedTreeRegressor, input: MLDailyMetrics) throws -> Double {
+
+        // 1. Build single-row DataFrame
+        var inputFrame = DataFrame()
+
+        inputFrame.append(column: Column(name: "sleep_duration", contents: [input.sleepDuration ?? 8.0]))
+        inputFrame.append(column: Column(name: "sleep_efficiency", contents: [input.sleepEfficiency ?? 80.0]))
+        inputFrame.append(column: Column(name: "restorative_sleep_pct", contents: [input.restorativeSleepPercentage ?? 30.0]))
+        inputFrame.append(column: Column(name: "sleep_debt", contents: [input.sleepDebt ?? 0.0]))
+        inputFrame.append(column: Column(name: "sleep_consistency", contents: [input.sleepConsistency ?? 80.0]))
+        inputFrame.append(column: Column(name: "avg_sleep_7d", contents: [input.avgSleepLast7Days ?? 8.0]))
+
+        inputFrame.append(column: Column(name: "hrv", contents: [input.hrvAverage ?? 50.0]))
+        inputFrame.append(column: Column(name: "hrv_deviation", contents: [input.hrvDeviation ?? 0.0]))
+        inputFrame.append(column: Column(name: "rhr", contents: [input.restingHeartRate ?? 60.0]))
+        inputFrame.append(column: Column(name: "rhr_deviation", contents: [input.rhrDeviation ?? 0.0]))
+        inputFrame.append(column: Column(name: "avg_hrv_7d", contents: [input.avgHRVLast7Days ?? 50.0]))
+        inputFrame.append(column: Column(name: "avg_rhr_7d", contents: [input.avgRHRLast7Days ?? 60.0]))
+
+        inputFrame.append(column: Column(name: "today_strain", contents: [input.todayStrain]))
+        inputFrame.append(column: Column(name: "avg_strain_7d", contents: [input.avgStrainLast7Days ?? input.todayStrain]))
+        inputFrame.append(column: Column(name: "avg_strain_3d", contents: [input.avgStrainLast3Days ?? input.todayStrain]))
+        inputFrame.append(column: Column(name: "days_since_rest", contents: [Double(input.daysSinceRestDay ?? 0)]))
+
+        inputFrame.append(column: Column(name: "avg_stress", contents: [input.averageStress ?? 0.0]))
+        inputFrame.append(column: Column(name: "max_stress", contents: [input.maxStress ?? 0.0]))
+        inputFrame.append(column: Column(name: "avg_stress_7d", contents: [input.avgStressLast7Days ?? 0.0]))
+
+        inputFrame.append(column: Column(name: "avg_recovery_7d", contents: [input.avgRecoveryLast7Days ?? 70.0]))
+        inputFrame.append(column: Column(name: "avg_sleep_eff_7d", contents: [input.avgSleepEfficiencyLast7Days ?? 80.0]))
+
+        inputFrame.append(column: Column(name: "recovery_trend_3d", contents: [input.recoveryTrend3Day ?? 0.0]))
+        inputFrame.append(column: Column(name: "sleep_trend_3d", contents: [input.sleepTrend3Day ?? 0.0]))
+        inputFrame.append(column: Column(name: "hrv_trend_3d", contents: [input.hrvTrend3Day ?? 0.0]))
+
+        inputFrame.append(column: Column(name: "day_of_week", contents: [Double(input.dayOfWeek)]))
+        inputFrame.append(column: Column(name: "is_weekend", contents: [input.isWeekend ? 1.0 : 0.0]))
+        inputFrame.append(column: Column(name: "is_rest_day", contents: [input.isRestDay ? 1.0 : 0.0]))
+
+
+        // ---- 1. Predict ----
+        let outputColumn = try model.predictions(from: inputFrame)   // THIS RETURNS AnyColumn
+
+
+        // ---- 2. Extract the single value ----
+        guard outputColumn.count > 0,
+                let value = outputColumn[0] as? Double else {
+            throw MLTrainingError.predictionFailed
+        }
         
-        let prediction = try model.prediction(from: inputDict)
-        return prediction
+        return value
     }
-    
+
+
     // MARK: - Model Persistence
     
-    private func saveModel(_ model: MLRegressor) throws {
-        // Save as CoreML model
+    private func saveModel(_ model: MLBoostedTreeRegressor) throws {
         let metadata = MLModelMetadata(
             author: "StrainFitnessTracker",
             shortDescription: "Recovery prediction model",
-            version: "\(modelVersion)",
-            license: "Private"
+            license: "Private",
+            version: "\(modelVersion)"
         )
         
-        try model.write(to: modelURL, metadata: metadata)
+        // 1. Export a temporary .mlmodel package
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TempRecoveryPredictor.mlmodel")
         
-        print("  💾 Model saved to: \(modelURL.path)")
+        if FileManager.default.fileExists(atPath: tempURL.path) {
+            try FileManager.default.removeItem(at: tempURL)
+        }
+
+        try model.write(to: tempURL, metadata: metadata)
         
-        // Compile for faster loading
-        let compiledURL = try MLModel.compileModel(at: modelURL)
-        
-        // Move compiled model to expected location
+        print("💾 MLModel (uncompiled) exported to: \(tempURL)")
+
+        // 2. Compile it
+        let compiledURL = try MLModel.compileModel(at: tempURL)
+
+        // 3. Move compiled model into **your Documents directory**
         if FileManager.default.fileExists(atPath: compiledModelURL.path) {
             try FileManager.default.removeItem(at: compiledModelURL)
         }
-        try FileManager.default.moveItem(at: compiledURL, to: compiledModelURL)
         
-        print("  ✅ Model compiled to: \(compiledModelURL.path)")
+        try FileManager.default.copyItem(at: compiledURL, to: compiledModelURL)
+        
+        print("✅ Compiled MLModel saved to: \(compiledModelURL.path)")
     }
     
     // MARK: - Prediction with Trained Model
@@ -334,7 +342,7 @@ class OnDeviceMLTrainer: ObservableObject {
             throw MLTrainingError.modelNotFound
         }
         
-        let mlModel = try MLModel(contentsOf: compiledModelURL)
+        let mlModel = try await MLModel.load(contentsOf: compiledModelURL)
         
         // 2. Get today's features
         let todayFeatures = try await featureService.generateMLMetrics(for: Date())
@@ -378,7 +386,7 @@ class OnDeviceMLTrainer: ObservableObject {
         
         // 4. Make prediction
         let provider = try MLDictionaryFeatureProvider(dictionary: inputDict)
-        let prediction = try mlModel.prediction(from: provider)
+        let prediction = try await mlModel.prediction(from: provider)
         
         guard let predictedValue = prediction.featureValue(for: "tomorrow_recovery")?.doubleValue else {
             throw MLTrainingError.predictionFailed
@@ -485,4 +493,3 @@ enum MLTrainingError: LocalizedError {
         }
     }
 }
-
