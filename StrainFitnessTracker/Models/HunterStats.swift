@@ -203,39 +203,76 @@ struct SwimEventDefinition: Identifiable, Hashable {
     let distance: Double // meters (use decimals to differentiate strokes)
     let displayName: String
     let worldRecordSeconds: TimeInterval
+    let unit: DistanceUnit
 
     var id: Double { distance }
 
+    init(distance: Double, displayName: String, worldRecordSeconds: TimeInterval, unit: DistanceUnit = .meters) {
+        self.distance = distance
+        self.displayName = displayName
+        self.worldRecordSeconds = worldRecordSeconds
+        self.unit = unit
+    }
+
     // UPDATED: Expanded catalog with all strokes
     static let expandedCatalog: [SwimEventDefinition] = [
-        // Freestyle
-        SwimEventDefinition(distance: 25, displayName: "25m Freestyle", worldRecordSeconds: 10.5),
-        SwimEventDefinition(distance: 50, displayName: "50m Freestyle", worldRecordSeconds: 20.91),
-        SwimEventDefinition(distance: 100, displayName: "100m Freestyle", worldRecordSeconds: 46.86),
-        SwimEventDefinition(distance: 200, displayName: "200m Freestyle", worldRecordSeconds: 102.0),
-        SwimEventDefinition(distance: 400, displayName: "400m Freestyle", worldRecordSeconds: 220.07),
-        SwimEventDefinition(distance: 800, displayName: "800m Freestyle", worldRecordSeconds: 452.35),
-        SwimEventDefinition(distance: 1500, displayName: "1500m Freestyle", worldRecordSeconds: 870.95),
-        
-        // Backstroke
-        SwimEventDefinition(distance: 50.1, displayName: "50m Backstroke", worldRecordSeconds: 23.71),
-        SwimEventDefinition(distance: 100.1, displayName: "100m Backstroke", worldRecordSeconds: 51.60),
-        SwimEventDefinition(distance: 200.1, displayName: "200m Backstroke", worldRecordSeconds: 111.92),
-        
-        // Breaststroke
-        SwimEventDefinition(distance: 50.2, displayName: "50m Breaststroke", worldRecordSeconds: 25.95),
-        SwimEventDefinition(distance: 100.2, displayName: "100m Breaststroke", worldRecordSeconds: 56.88),
-        SwimEventDefinition(distance: 200.2, displayName: "200m Breaststroke", worldRecordSeconds: 125.95),
-        
-        // Butterfly
-        SwimEventDefinition(distance: 50.3, displayName: "50m Butterfly", worldRecordSeconds: 22.27),
-        SwimEventDefinition(distance: 100.3, displayName: "100m Butterfly", worldRecordSeconds: 49.45),
-        SwimEventDefinition(distance: 200.3, displayName: "200m Butterfly", worldRecordSeconds: 110.73),
-        
-        // Individual Medley
-        SwimEventDefinition(distance: 100.4, displayName: "100m IM", worldRecordSeconds: 51.30),
-        SwimEventDefinition(distance: 200.4, displayName: "200m IM", worldRecordSeconds: 110.34),
-        SwimEventDefinition(distance: 400.4, displayName: "400m IM", worldRecordSeconds: 240.54)
+        // Freestyle (Meters)
+        SwimEventDefinition(distance: 25, displayName: "25m Freestyle", worldRecordSeconds: 10.5, unit: .meters),
+        SwimEventDefinition(distance: 50, displayName: "50m Freestyle", worldRecordSeconds: 20.91, unit: .meters),
+        SwimEventDefinition(distance: 100, displayName: "100m Freestyle", worldRecordSeconds: 46.86, unit: .meters),
+        SwimEventDefinition(distance: 200, displayName: "200m Freestyle", worldRecordSeconds: 102.0, unit: .meters),
+        SwimEventDefinition(distance: 400, displayName: "400m Freestyle", worldRecordSeconds: 220.07, unit: .meters),
+        SwimEventDefinition(distance: 800, displayName: "800m Freestyle", worldRecordSeconds: 452.35, unit: .meters),
+        SwimEventDefinition(distance: 1500, displayName: "1500m Freestyle", worldRecordSeconds: 870.95, unit: .meters),
+
+        // Backstroke (Meters)
+        SwimEventDefinition(distance: 50.1, displayName: "50m Backstroke", worldRecordSeconds: 23.71, unit: .meters),
+        SwimEventDefinition(distance: 100.1, displayName: "100m Backstroke", worldRecordSeconds: 51.60, unit: .meters),
+        SwimEventDefinition(distance: 200.1, displayName: "200m Backstroke", worldRecordSeconds: 111.92, unit: .meters),
+
+        // Breaststroke (Meters)
+        SwimEventDefinition(distance: 50.2, displayName: "50m Breaststroke", worldRecordSeconds: 25.95, unit: .meters),
+        SwimEventDefinition(distance: 100.2, displayName: "100m Breaststroke", worldRecordSeconds: 56.88, unit: .meters),
+        SwimEventDefinition(distance: 200.2, displayName: "200m Breaststroke", worldRecordSeconds: 125.95, unit: .meters),
+
+        // Butterfly (Meters)
+        SwimEventDefinition(distance: 50.3, displayName: "50m Butterfly", worldRecordSeconds: 22.27, unit: .meters),
+        SwimEventDefinition(distance: 100.3, displayName: "100m Butterfly", worldRecordSeconds: 49.45, unit: .meters),
+        SwimEventDefinition(distance: 200.3, displayName: "200m Butterfly", worldRecordSeconds: 110.73, unit: .meters),
+
+        // Individual Medley (Meters)
+        SwimEventDefinition(distance: 100.4, displayName: "100m IM", worldRecordSeconds: 51.30, unit: .meters),
+        SwimEventDefinition(distance: 200.4, displayName: "200m IM", worldRecordSeconds: 110.34, unit: .meters),
+        SwimEventDefinition(distance: 400.4, displayName: "400m IM", worldRecordSeconds: 240.54, unit: .meters),
+
+        // Freestyle (Yards - stored offset to keep identifiers unique)
+        SwimEventDefinition(distance: 1025, displayName: "25y Freestyle", worldRecordSeconds: 9.5, unit: .yards),
+        SwimEventDefinition(distance: 1050, displayName: "50y Freestyle", worldRecordSeconds: 19.05, unit: .yards),
+        SwimEventDefinition(distance: 1100, displayName: "100y Freestyle", worldRecordSeconds: 42.80, unit: .yards),
+        SwimEventDefinition(distance: 1200, displayName: "200y Freestyle", worldRecordSeconds: 93.25, unit: .yards),
+        SwimEventDefinition(distance: 1500.5, displayName: "500y Freestyle", worldRecordSeconds: 267.50, unit: .yards),
+        SwimEventDefinition(distance: 11000, displayName: "1000y Freestyle", worldRecordSeconds: 537.53, unit: .yards),
+        SwimEventDefinition(distance: 11650, displayName: "1650y Freestyle", worldRecordSeconds: 894.50, unit: .yards),
+
+        // Backstroke (Yards)
+        SwimEventDefinition(distance: 1050.1, displayName: "50y Backstroke", worldRecordSeconds: 21.66, unit: .yards),
+        SwimEventDefinition(distance: 1100.1, displayName: "100y Backstroke", worldRecordSeconds: 47.08, unit: .yards),
+        SwimEventDefinition(distance: 1200.1, displayName: "200y Backstroke", worldRecordSeconds: 102.13, unit: .yards),
+
+        // Breaststroke (Yards)
+        SwimEventDefinition(distance: 1050.2, displayName: "50y Breaststroke", worldRecordSeconds: 23.69, unit: .yards),
+        SwimEventDefinition(distance: 1100.2, displayName: "100y Breaststroke", worldRecordSeconds: 51.90, unit: .yards),
+        SwimEventDefinition(distance: 1200.2, displayName: "200y Breaststroke", worldRecordSeconds: 114.87, unit: .yards),
+
+        // Butterfly (Yards)
+        SwimEventDefinition(distance: 1050.3, displayName: "50y Butterfly", worldRecordSeconds: 20.32, unit: .yards),
+        SwimEventDefinition(distance: 1100.3, displayName: "100y Butterfly", worldRecordSeconds: 45.19, unit: .yards),
+        SwimEventDefinition(distance: 1200.3, displayName: "200y Butterfly", worldRecordSeconds: 101.27, unit: .yards),
+
+        // Individual Medley (Yards)
+        SwimEventDefinition(distance: 1100.4, displayName: "100y IM", worldRecordSeconds: 46.78, unit: .yards),
+        SwimEventDefinition(distance: 1200.4, displayName: "200y IM", worldRecordSeconds: 100.79, unit: .yards),
+        SwimEventDefinition(distance: 1400.4, displayName: "400y IM", worldRecordSeconds: 219.22, unit: .yards)
     ]
     
     // Keep old catalog for backward compatibility
