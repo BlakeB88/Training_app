@@ -488,7 +488,8 @@ struct HunterLevelCurve {
 }
 
 // MARK: - Collection Helpers
-private extension Array where Element == Double {
+private extension Collection where Element == Double {
+    /// Allow `average()` to work for ArraySlices produced by `prefix` so the Hunter stats build errors are resolved.
     func average() -> Double {
         guard !self.isEmpty else { return 0 }
         let total = self.reduce(0, +)
