@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import HealthKit
 
 @MainActor
@@ -11,8 +12,8 @@ final class HunterStatsViewModel: ObservableObject {
     private let statsEngine = HunterStatsEngine()
     private let persistence = HunterProgressPersistence()
 
-    init(repository: MetricsRepository = MetricsRepository()) {
-        self.repository = repository
+    init(repository: MetricsRepository? = nil) {
+        self.repository = repository ?? MetricsRepository()
     }
 
     func load() async {
