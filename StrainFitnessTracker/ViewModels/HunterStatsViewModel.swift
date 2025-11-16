@@ -11,9 +11,11 @@ final class HunterStatsViewModel: ObservableObject {
     private let repository: MetricsRepository
     private let statsEngine = HunterStatsEngine()
     private let persistence = HunterProgressPersistence()
+    private let healthKitManager: HealthKitManager
 
-    init(repository: MetricsRepository? = nil) {
+    init(repository: MetricsRepository? = nil, healthKitManager: HealthKitManager = .shared) {
         self.repository = repository ?? MetricsRepository()
+        self.healthKitManager = healthKitManager
     }
 
     func load() async {
@@ -25,7 +27,7 @@ final class HunterStatsViewModel: ObservableObject {
         errorMessage = nil
         do {
             let metrics = try repository.fetchRecentDailyMetrics(days: 30)
-            let body = buildBodyCompositionInputs()
+            let body = await buildBodyCompositionInputs()
             let swimEvents = buildSwimEvents(from: metrics)
             let inputs = HunterStatsInputs(
                 metricsHistory: metrics,
@@ -43,7 +45,54 @@ final class HunterStatsViewModel: ObservableObject {
     }
 
     // MARK: - Builders
-    private func buildBodyCompositionInputs() -> BodyCompositionInputs {
+    private func buildBodyCompositionInputs() async -> BodyCompositionInputs {
+        var inputs = defaultBodyComposition()
+
+        guard healthKitManager.isAuthorized else {
+            return inputs
+        }
+
+        do {
+            let snapshot = try await healthKitManager.fetchBodyCompositionSnapshot()
+
+            if let weight = snapshot.weight {
+                inputs.weight = weight
+            }
+
+            if let leanMass = snapshot.leanBodyMass {
+                inputs.fatFreeMass = leanMass
+                inputs.muscleMass = max(leanMass * 0.9, leanMass - 8)
+                if inputs.weight > 0 {
+                    let leanRatio = leanMass / inputs.weight
+                    inputs.bodyWaterPercentage = min(75, max(45, leanRatio * 72))
+                    inputs.proteinPercentage = min(30, max(12, leanRatio * 28))
+                    inputs.boneMass = max(6, leanMass * 0.04)
+                }
+                let leanMassKg = leanMass * 0.45359237
+                inputs.bmr = max(1200, round(370 + (21.6 * leanMassKg)))
+            }
+
+            if let bodyFat = snapshot.bodyFatPercentage {
+                inputs.bodyFatPercentage = bodyFat
+                inputs.subcutaneousFatPercentage = bodyFat * 0.8
+                inputs.visceralFat = max(4, (bodyFat - 8) * 0.6)
+            }
+
+            if let weight = snapshot.weight,
+               let height = snapshot.height,
+               height > 0 {
+                let weightKg = weight * 0.45359237
+                let bmi = weightKg / (height * height)
+                inputs.bmi = (bmi * 10).rounded() / 10
+            }
+        } catch {
+            print("⚠️ Failed to fetch body composition: \(error.localizedDescription)")
+        }
+
+        return inputs
+    }
+
+    private func defaultBodyComposition() -> BodyCompositionInputs {
         return BodyCompositionInputs(
             weight: 182,
             bodyFatPercentage: 17.5,
