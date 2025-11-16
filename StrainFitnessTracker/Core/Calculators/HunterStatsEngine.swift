@@ -85,7 +85,7 @@ struct HunterStatsEngine {
             let score = adjustedScores[category] ?? 0
             let rank = HunterRank.rank(for: score)
             let explanation = explanationFor(category: category, readiness: readiness, body: body, swimMastery: swimMasteryScore)
-            let positives = positiveHighlights(for: category, readiness: readiness, body: body)
+            let positives = positiveHighlights(for: category, readiness: readiness, body: body, swimMastery: swimMasteryScore)
             let negatives = negativeHighlights(for: category, readiness: readiness, body: body)
             let trend = trendFor(category: category, readiness: readiness)
             let nextHint = nextRankHint(for: rank, score: score)
@@ -320,20 +320,37 @@ struct HunterStatsEngine {
         }
     }
 
-    private func positiveHighlights(for category: HunterStatCategory, readiness: ReadinessContext, body: BodyCompositionInputs) -> [String] {
+    private func positiveHighlights(
+        for category: HunterStatCategory,
+        readiness: ReadinessContext,
+        body: BodyCompositionInputs,
+        swimMastery: Double
+    ) -> [String] {
         switch category {
         case .vitality:
-            return ["Sleep \(String(format: "%.1f h", readiness.sleepDurationHours))", "HRV \(Int(readiness.hrvAverage)) ms"]
+            return ["Sleep \(String(format: "%.1f h", readiness.sleepDurationHours))",
+                    "HRV \(Int(readiness.hrvAverage)) ms"]
+
         case .strength:
-            return ["Strain \(String(format: "%.1f", readiness.strainScore))", "Muscle mass \(Int(body.muscleMass)) lbs"]
+            return ["Strain \(String(format: "%.1f", readiness.strainScore))",
+                    "Muscle mass \(Int(body.muscleMass)) lbs"]
+
         case .endurance:
-            return ["VO₂Max \(Int(readiness.vo2Max))", "Steps \(readiness.steps)"]
+            return ["VO₂Max \(Int(readiness.vo2Max))",
+                    "Steps \(readiness.steps)"]
+
         case .agility:
-            return ["Readiness \(Int(readiness.recoveryScore))", "Steps \(readiness.steps)"]
+            return ["Readiness \(Int(readiness.recoveryScore))",
+                    "Steps \(readiness.steps)"]
+
         case .physique:
-            return ["Body fat \(String(format: "%.1f%%", body.bodyFatPercentage))", "BMI \(String(format: "%.1f", body.bmi))"]
+            return ["Body fat \(String(format: "%.1f%%", body.bodyFatPercentage))",
+                    "BMI \(String(format: "%.1f", body.bmi))"]
+
         case .metabolicPower:
-            return ["BMR \(Int(body.bmr))", "Protein \(Int(body.proteinPercentage))%"]
+            return ["BMR \(Int(body.bmr))",
+                    "Protein \(Int(body.proteinPercentage))%"]
+
         case .swimMastery:
             return ["Avg PI \(String(format: "%.0f", swimMastery))"]
         }

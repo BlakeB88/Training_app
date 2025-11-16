@@ -13,7 +13,7 @@ struct MLPredictionView: View {
             VStack(alignment: .leading, spacing: 24) {
                 RecoveryPredictionCard()
             }
-            .padding()
+            .padding(.bottom, 120)
         }
         .navigationTitle("AI Recovery Prediction")
     }

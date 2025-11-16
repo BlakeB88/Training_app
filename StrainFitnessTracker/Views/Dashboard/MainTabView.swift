@@ -57,14 +57,14 @@ struct MainTabView: View {
 
                 TabBarButton(
                     icon: "brain.head.profile",
-                    label: "Recovery Prediction",
+                    label: "Prediction",
                     isSelected: selectedTab == .health
                 ) {
                     selectedTab = .health
                 }
                 
                 TabBarButton(
-                    icon: "brain.head.profile",
+                    icon: "heart.fill",
                     label: "Stress",
                     isSelected: selectedTab == .stress
                 ) {
