@@ -7,10 +7,12 @@ final class HunterStatsViewModel: ObservableObject {
     @Published var snapshot: HunterStatsSnapshot?
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var showSwimTimeInput = false
 
     private let repository: MetricsRepository
     private let statsEngine = HunterStatsEngine()
     private let persistence = HunterProgressPersistence()
+    private let swimPersistence = SwimTimePersistence()
     private let healthKitManager: HealthKitManager
 
     init(repository: MetricsRepository? = nil, healthKitManager: HealthKitManager = .shared) {
@@ -28,7 +30,10 @@ final class HunterStatsViewModel: ObservableObject {
         do {
             let metrics = try repository.fetchRecentDailyMetrics(days: 30)
             let body = await buildBodyCompositionInputs()
-            let swimEvents = buildSwimEvents(from: metrics)
+            
+            // Use manual swim times instead of workout data
+            let swimEvents = buildSwimEventsFromManualInput()
+            
             let inputs = HunterStatsInputs(
                 metricsHistory: metrics,
                 bodyComposition: body,
@@ -109,6 +114,18 @@ final class HunterStatsViewModel: ObservableObject {
         )
     }
 
+    // NEW: Build swim events from manual user input
+    private func buildSwimEventsFromManualInput() -> [SwimEventInput] {
+        let manualTimes = swimPersistence.getAllBestTimes()
+        
+        if manualTimes.isEmpty {
+            return defaultSwimEvents()
+        }
+        
+        return manualTimes
+    }
+
+    // DEPRECATED: Old method that parsed workout data
     private func buildSwimEvents(from metrics: [SimpleDailyMetrics]) -> [SwimEventInput] {
         var bestByEvent: [Double: SwimEventInput] = [:]
         let workouts = metrics.flatMap { $0.workouts }
@@ -136,9 +153,9 @@ final class HunterStatsViewModel: ObservableObject {
     private func defaultSwimEvents() -> [SwimEventInput] {
         let today = Date()
         return [
-            SwimEventInput(definition: SwimEventDefinition.catalog[0], personalRecordSeconds: 28.5, recordDate: today.addingTimeInterval(-86400 * 3)),
-            SwimEventInput(definition: SwimEventDefinition.catalog[2], personalRecordSeconds: 125.0, recordDate: today.addingTimeInterval(-86400 * 10)),
-            SwimEventInput(definition: SwimEventDefinition.catalog[4], personalRecordSeconds: 520.0, recordDate: today.addingTimeInterval(-86400 * 15))
+            SwimEventInput(definition: SwimEventDefinition.expandedCatalog[1], personalRecordSeconds: 28.5, recordDate: today.addingTimeInterval(-86400 * 3)),
+            SwimEventInput(definition: SwimEventDefinition.expandedCatalog[2], personalRecordSeconds: 125.0, recordDate: today.addingTimeInterval(-86400 * 10)),
+            SwimEventInput(definition: SwimEventDefinition.expandedCatalog[4], personalRecordSeconds: 520.0, recordDate: today.addingTimeInterval(-86400 * 15))
         ]
     }
 }

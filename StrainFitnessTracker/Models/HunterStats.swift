@@ -200,12 +200,45 @@ struct HunterStatsSnapshot {
 
 // MARK: - Swim Models
 struct SwimEventDefinition: Identifiable, Hashable {
-    let distance: Double // meters
+    let distance: Double // meters (use decimals to differentiate strokes)
     let displayName: String
     let worldRecordSeconds: TimeInterval
 
     var id: Double { distance }
 
+    // UPDATED: Expanded catalog with all strokes
+    static let expandedCatalog: [SwimEventDefinition] = [
+        // Freestyle
+        SwimEventDefinition(distance: 25, displayName: "25m Freestyle", worldRecordSeconds: 10.5),
+        SwimEventDefinition(distance: 50, displayName: "50m Freestyle", worldRecordSeconds: 20.91),
+        SwimEventDefinition(distance: 100, displayName: "100m Freestyle", worldRecordSeconds: 46.86),
+        SwimEventDefinition(distance: 200, displayName: "200m Freestyle", worldRecordSeconds: 102.0),
+        SwimEventDefinition(distance: 400, displayName: "400m Freestyle", worldRecordSeconds: 220.07),
+        SwimEventDefinition(distance: 800, displayName: "800m Freestyle", worldRecordSeconds: 452.35),
+        SwimEventDefinition(distance: 1500, displayName: "1500m Freestyle", worldRecordSeconds: 870.95),
+        
+        // Backstroke
+        SwimEventDefinition(distance: 50.1, displayName: "50m Backstroke", worldRecordSeconds: 23.71),
+        SwimEventDefinition(distance: 100.1, displayName: "100m Backstroke", worldRecordSeconds: 51.60),
+        SwimEventDefinition(distance: 200.1, displayName: "200m Backstroke", worldRecordSeconds: 111.92),
+        
+        // Breaststroke
+        SwimEventDefinition(distance: 50.2, displayName: "50m Breaststroke", worldRecordSeconds: 25.95),
+        SwimEventDefinition(distance: 100.2, displayName: "100m Breaststroke", worldRecordSeconds: 56.88),
+        SwimEventDefinition(distance: 200.2, displayName: "200m Breaststroke", worldRecordSeconds: 125.95),
+        
+        // Butterfly
+        SwimEventDefinition(distance: 50.3, displayName: "50m Butterfly", worldRecordSeconds: 22.27),
+        SwimEventDefinition(distance: 100.3, displayName: "100m Butterfly", worldRecordSeconds: 49.45),
+        SwimEventDefinition(distance: 200.3, displayName: "200m Butterfly", worldRecordSeconds: 110.73),
+        
+        // Individual Medley
+        SwimEventDefinition(distance: 100.4, displayName: "100m IM", worldRecordSeconds: 51.30),
+        SwimEventDefinition(distance: 200.4, displayName: "200m IM", worldRecordSeconds: 110.34),
+        SwimEventDefinition(distance: 400.4, displayName: "400m IM", worldRecordSeconds: 240.54)
+    ]
+    
+    // Keep old catalog for backward compatibility
     static let catalog: [SwimEventDefinition] = [
         SwimEventDefinition(distance: 50, displayName: "50m Freestyle", worldRecordSeconds: 20.91),
         SwimEventDefinition(distance: 100, displayName: "100m Freestyle", worldRecordSeconds: 46.86),
@@ -216,7 +249,7 @@ struct SwimEventDefinition: Identifiable, Hashable {
     ]
 
     static func closestMatch(for distance: Double) -> SwimEventDefinition? {
-        return catalog.min(by: { abs($0.distance - distance) < abs($1.distance - distance) })
+        return expandedCatalog.min(by: { abs($0.distance - distance) < abs($1.distance - distance) })
     }
 }
 
