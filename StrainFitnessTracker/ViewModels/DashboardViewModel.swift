@@ -22,6 +22,7 @@ class DashboardViewModel: ObservableObject {
     @Published var workoutDetails: [UUID: WorkoutSummary] = [:]
     @Published var sleepDetails: [UUID: HealthKitManager.SleepData] = [:]
     @Published var todaysSleepData: HealthKitManager.SleepData?
+    @Published var watchBatteryLevel: Int?
     
     // MARK: - Dependencies
     private let dataSyncService: DataSyncService
@@ -45,6 +46,7 @@ class DashboardViewModel: ObservableObject {
         self.metrics = DailyMetrics.sampleData
         self.weekData = StrainRecoveryWeekData.sampleData
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
+        self.watchBatteryLevel = DataSharingManager.shared.getWatchBatteryLevel()
     }
     
     // MARK: - Computed Properties for Time Display
@@ -112,7 +114,8 @@ class DashboardViewModel: ObservableObject {
     func initialize() async {
         guard !hasInitialized else { return }
         hasInitialized = true
-        
+
+        refreshWatchBatteryLevel()
         // Setup observers now that we're initialized
         setupObservers()
         
@@ -198,6 +201,10 @@ class DashboardViewModel: ObservableObject {
         isLoading = false
         
         print("✅ Dashboard refresh completed")
+    }
+
+    func refreshWatchBatteryLevel() {
+        watchBatteryLevel = DataSharingManager.shared.getWatchBatteryLevel()
     }
     
     /// Quick refresh of just stress data (lightweight)
@@ -300,7 +307,8 @@ class DashboardViewModel: ObservableObject {
     
     private func loadFromRepository(for date: Date = Date()) async {
         print("📂 Loading from repository for \(date.formatted())...")
-        
+
+        refreshWatchBatteryLevel()
         // Load today's metrics
         guard let simpleDailyMetrics = try? repository.fetchDailyMetrics(for: date) else {
             // No data yet - this is normal for first launch

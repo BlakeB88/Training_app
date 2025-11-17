@@ -24,6 +24,8 @@ class DataSharingManager {
         static let strain = "shared_strain"
         static let exertion = "shared_exertion"
         static let lastUpdate = "shared_last_update"
+        static let watchBattery = "shared_watch_battery"
+        static let watchBatteryUpdate = "shared_watch_battery_update"
     }
     
     private init() {
@@ -77,6 +79,15 @@ class DataSharingManager {
         defaults.set(Date(), forKey: Keys.lastUpdate)
         defaults.synchronize()
     }
+
+    func saveWatchBatteryLevel(_ percentage: Int) {
+        guard let defaults = userDefaults else { return }
+        let clampedValue = max(0, min(100, percentage))
+        defaults.set(clampedValue, forKey: Keys.watchBattery)
+        defaults.set(Date(), forKey: Keys.watchBatteryUpdate)
+        defaults.synchronize()
+        print("⌚️ Saved watch battery: \(clampedValue)%")
+    }
     
     // MARK: - Retrieve Methods
     
@@ -125,6 +136,18 @@ class DataSharingManager {
         guard let defaults = userDefaults else { return nil }
         let value = defaults.integer(forKey: Keys.exertion)
         return value > 0 ? value : nil
+    }
+
+    func getWatchBatteryLevel() -> Int? {
+        guard let defaults = userDefaults else { return nil }
+        guard defaults.object(forKey: Keys.watchBattery) != nil else { return nil }
+        let value = defaults.integer(forKey: Keys.watchBattery)
+        return max(0, min(100, value))
+    }
+
+    func getWatchBatteryLastUpdate() -> Date? {
+        guard let defaults = userDefaults else { return nil }
+        return defaults.object(forKey: Keys.watchBatteryUpdate) as? Date
     }
     
     func isDataStale() -> Bool {
