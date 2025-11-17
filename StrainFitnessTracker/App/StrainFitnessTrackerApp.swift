@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct StrainFitnessTrackerApp: App {
     @StateObject private var healthKitManager = HealthKitManager.shared
+    @StateObject private var notificationService = NotificationService.shared
     @State private var hasRequestedPermissions = false
     
     init() {
@@ -23,13 +24,15 @@ struct StrainFitnessTrackerApp: App {
                     // Request permissions on first launch
                     if !hasRequestedPermissions {
                         await requestHealthKitPermissions()
+                        await requestNotificationPermissions()
                         hasRequestedPermissions = true
                     }
                 }
                 .environmentObject(healthKitManager)
+                .environmentObject(notificationService)
         }
     }
-    
+
     private func requestHealthKitPermissions() async {
         do {
             try await HealthKitManager.shared.requestAuthorization()
@@ -42,6 +45,15 @@ struct StrainFitnessTrackerApp: App {
             print("✅ Initial sync complete")
         } catch {
             print("❌ HealthKit authorization failed: \(error)")
+        }
+    }
+
+    private func requestNotificationPermissions() async {
+        do {
+            try await notificationService.requestAuthorization()
+            print("🔔 Notifications authorized: \(notificationService.isAuthorized)")
+        } catch {
+            print("⚠️ Notification authorization failed: \(error)")
         }
     }
 }
