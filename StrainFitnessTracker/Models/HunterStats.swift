@@ -44,6 +44,25 @@ enum HunterRank: String, CaseIterable, Comparable, Codable {
         }
     }
 
+    var tagline: String {
+        switch self {
+        case .E:
+            return "Get some rest and rebuild."
+        case .D:
+            return "Stay consistent to rank up."
+        case .C:
+            return "Solid foundation—keep grinding."
+        case .B:
+            return "Battle ready with room to grow."
+        case .A:
+            return "Elite form, lean into the momentum."
+        case .S:
+            return "Awakened hunter energy detected."
+        case .SPlus:
+            return "Transcendent focus—maintain the edge."
+        }
+    }
+
     static func rank(for score: Double) -> HunterRank {
         if score >= HunterRank.SPlus.minimumScore { return .SPlus }
         if score >= HunterRank.S.minimumScore { return .S }

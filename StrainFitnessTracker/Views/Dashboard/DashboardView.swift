@@ -34,7 +34,10 @@ struct DashboardView: View {
                         VStack(spacing: 20) {
                             // Header Section
                             headerSection
-                            
+
+                            // Performance Widget
+                            performanceWidgetSection
+
                             // Primary Metrics (Sleep, Recovery, Strain)
                             primaryMetricsSection
                             
@@ -205,7 +208,16 @@ struct DashboardView: View {
             }
         }
     }
-    
+
+    private var performanceWidgetSection: some View {
+        PerformanceWidgetView(
+            metrics: viewModel.metrics,
+            hunterRank: hunterViewModel.snapshot?.hunterRank,
+            hunterScore: hunterViewModel.snapshot?.dailyScore,
+            lastUpdatedText: viewModel.lastSyncTime
+        )
+    }
+
     // MARK: - Primary Metrics Section
     private var primaryMetricsSection: some View {
         VStack(spacing: 16) {
