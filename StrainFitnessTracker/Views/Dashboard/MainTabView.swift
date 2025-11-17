@@ -49,7 +49,7 @@ struct MainTabView: View {
                 
                 TabBarButton(
                     icon: "shield.fill",
-                    label: "Hunter",
+                    label: "Stats",
                     isSelected: selectedTab == .hunter
                 ) {
                     selectedTab = .hunter

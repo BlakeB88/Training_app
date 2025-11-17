@@ -9,12 +9,30 @@ struct HunterStatsView: View {
                 Color.appBackground.ignoresSafeArea()
                 content
             }
-            .navigationTitle("Hunter Stats")
+            .navigationTitle("Stats")
             .toolbarBackground(Color.cardBackground, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        viewModel.showSwimTimeInput = true
+                    }) {
+                        Label("Add Time", systemImage: "stopwatch.fill")
+                            .foregroundColor(.accentBlue)
+                    }
+                }
+            }
         }
         .task {
             await viewModel.load()
+        }
+        .sheet(isPresented: $viewModel.showSwimTimeInput) {
+            SwimTimeInputView()
+                .onDisappear {
+                    Task {
+                        await viewModel.refresh()
+                    }
+                }
         }
     }
 
