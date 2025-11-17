@@ -44,7 +44,7 @@ final class ComplicationController: NSObject, CLKComplicationDataSource {
 
     func getCurrentTimelineEntry(
         for complication: CLKComplication,
-        with handler: @escaping (CLKComplicationTimelineEntry?) -> Void
+        withHandler handler: @escaping (CLKComplicationTimelineEntry?) -> Void
     ) {
         let metrics = loadMetrics()
         guard let template = template(for: complication.family, metrics: metrics) else {

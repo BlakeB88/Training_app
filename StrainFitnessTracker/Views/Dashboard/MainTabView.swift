@@ -12,6 +12,7 @@ struct MainTabView: View {
     
     enum Tab {
         case home
+        case hunter
         case health
         case stress
         case more
@@ -24,6 +25,8 @@ struct MainTabView: View {
                 switch selectedTab {
                 case .home:
                     DashboardView()
+                case .hunter:
+                    HunterStatsView()
                 case .health:
                     MLPredictionView()
                     
@@ -45,15 +48,23 @@ struct MainTabView: View {
                 }
                 
                 TabBarButton(
+                    icon: "shield.fill",
+                    label: "Stats",
+                    isSelected: selectedTab == .hunter
+                ) {
+                    selectedTab = .hunter
+                }
+
+                TabBarButton(
                     icon: "brain.head.profile",
-                    label: "Recovery Prediction",
+                    label: "Prediction",
                     isSelected: selectedTab == .health
                 ) {
                     selectedTab = .health
                 }
                 
                 TabBarButton(
-                    icon: "brain.head.profile",
+                    icon: "heart.fill",
                     label: "Stress",
                     isSelected: selectedTab == .stress
                 ) {

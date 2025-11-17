@@ -35,6 +35,10 @@ class HealthKitManager: ObservableObject {
         HKObjectType.quantityType(forIdentifier: .dietaryFatTotal)!,
         HKObjectType.quantityType(forIdentifier: .dietaryWater)!,
         HKObjectType.quantityType(forIdentifier: .dietaryCaffeine)!,
+        HKObjectType.quantityType(forIdentifier: .bodyMass)!,
+        HKObjectType.quantityType(forIdentifier: .bodyFatPercentage)!,
+        HKObjectType.quantityType(forIdentifier: .leanBodyMass)!,
+        HKObjectType.quantityType(forIdentifier: .height)!
     ]
     
     private init() {}
@@ -160,7 +164,7 @@ class HealthKitManager: ObservableObject {
     func fetchHRVReadings(from startDate: Date, to endDate: Date) async throws -> [Double] {
         let hrvType = HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!
         let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate, options: .strictStartDate)
-        
+
         return try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
                 sampleType: hrvType,
@@ -183,7 +187,64 @@ class HealthKitManager: ObservableObject {
             healthStore.execute(query)
         }
     }
-    
+
+    // MARK: - Body Composition Queries
+
+    struct BodyCompositionSnapshot {
+        let weight: Double?
+        let bodyFatPercentage: Double?
+        let leanBodyMass: Double?
+        let height: Double?
+    }
+
+    func fetchBodyCompositionSnapshot() async throws -> BodyCompositionSnapshot {
+        async let weightTask = fetchLatestQuantity(for: .bodyMass, unit: HKUnit.pound())
+        async let fatTask = fetchLatestQuantity(for: .bodyFatPercentage, unit: HKUnit.percent())
+        async let leanTask = fetchLatestQuantity(for: .leanBodyMass, unit: HKUnit.pound())
+        async let heightTask = fetchLatestQuantity(for: .height, unit: HKUnit.meterUnit(with: .none))
+
+        let (weight, bodyFatRaw, leanMass, height) = try await (weightTask, fatTask, leanTask, heightTask)
+        let bodyFatPercentage = bodyFatRaw.map { $0 * 100 }
+
+        return BodyCompositionSnapshot(
+            weight: weight,
+            bodyFatPercentage: bodyFatPercentage,
+            leanBodyMass: leanMass,
+            height: height
+        )
+    }
+
+    private func fetchLatestQuantity(for identifier: HKQuantityTypeIdentifier, unit: HKUnit) async throws -> Double? {
+        guard let type = HKQuantityType.quantityType(forIdentifier: identifier) else {
+            return nil
+        }
+
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let query = HKSampleQuery(
+                sampleType: type,
+                predicate: nil,
+                limit: 1,
+                sortDescriptors: [sortDescriptor]
+            ) { _, samples, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let sample = samples?.first as? HKQuantitySample else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+
+                continuation.resume(returning: sample.quantity.doubleValue(for: unit))
+            }
+
+            healthStore.execute(query)
+        }
+    }
+
     // MARK: - Heart Rate Queries
     
     func fetchRestingHeartRate() async throws -> Double? {
