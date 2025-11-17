@@ -190,10 +190,18 @@ struct DashboardView: View {
                 Image(systemName: "applewatch")
                     .font(.system(size: 14))
                     .foregroundColor(.secondaryText)
-                
-                Text("--")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.secondaryText)
+
+                if let battery = viewModel.watchBatteryLevel {
+                    Text("\(battery)%")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(battery < 20 ? .warningOrange : .secondaryText)
+                        .accessibilityLabel("Apple Watch battery \(battery) percent")
+                } else {
+                    Text("--")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondaryText)
+                        .accessibilityLabel("Apple Watch battery unavailable")
+                }
             }
         }
     }

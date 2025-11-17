@@ -1,9 +1,11 @@
 import SwiftUI
+import WatchKit
 
 struct WatchDashboardView: View {
     @State private var metrics: MetricsSnapshot?
     @State private var isLoading = true
     @State private var debugInfo: String = ""
+    @State private var batteryLevel: Int?
     
     var body: some View {
         ScrollView {
@@ -146,6 +148,7 @@ struct WatchDashboardView: View {
         .onAppear {
             print("⌚️ [Watch] View appeared")
             loadMetrics()
+            updateBatteryLevel()
         }
     }
     
@@ -188,13 +191,33 @@ struct WatchDashboardView: View {
             if let snapshot = DataSharingManager.shared.getLatestMetrics() {
                 print("✅ [Watch] Got metrics snapshot")
                 metrics = snapshot
-                debugInfo = "✅ Data loaded\nR=\(snapshot.recoveryPercentage)% S=\(snapshot.strainPercentage)%"
+                var info = "✅ Data loaded\nR=\(snapshot.recoveryPercentage)% S=\(snapshot.strainPercentage)%"
+                if let batteryLevel {
+                    info += "\nBattery=\(batteryLevel)%"
+                }
+                debugInfo = info
             } else {
                 print("⚠️ [Watch] No metrics available")
                 debugInfo = "⚠️ No data in App Group"
             }
             isLoading = false
         }
+    }
+
+    private func updateBatteryLevel() {
+        let device = WKInterfaceDevice.current()
+        device.isBatteryMonitoringEnabled = true
+
+        let level = device.batteryLevel
+        guard level >= 0 else {
+            print("⚠️ [Watch] Battery level unavailable")
+            return
+        }
+
+        let percentage = Int(level * 100)
+        batteryLevel = percentage
+        DataSharingManager.shared.saveWatchBatteryLevel(percentage)
+        print("⌚️ [Watch] Battery level saved: \(percentage)%")
     }
     
     private func timeAgo(_ date: Date) -> String {
