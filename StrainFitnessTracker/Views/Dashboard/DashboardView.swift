@@ -2,7 +2,7 @@
 //  DashboardView.swift
 //  StrainFitnessTracker
 //
-//  Main dashboard view - UPDATED to properly display stress data
+//  Main dashboard view - UPDATED to properly display stress data and Hunter Rank Card
 //
 
 import SwiftUI
@@ -13,6 +13,7 @@ struct DashboardView: View {
         repository: MetricsRepository(),
         stressMonitorVM: StressMonitorViewModel(healthKitManager: HealthKitManager.shared)
     )
+    @StateObject private var hunterViewModel = HunterStatsViewModel()
     @State private var selectedDate = Date()
     
     var body: some View {
@@ -43,6 +44,15 @@ struct DashboardView: View {
                             // My Day Section
                             myDaySection
                             
+                            // Stats Section Header
+                            Text("Stats")
+                                .font(.system(size: 28, weight: .bold))
+                                .foregroundColor(.primaryText)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            // Hunter Rank Card
+                            HunterRankCard(snapshot: hunterViewModel.snapshot)
+                            
                             // My Dashboard (Detailed Metrics)
                             myDashboardSection
                             
@@ -57,6 +67,7 @@ struct DashboardView: View {
                     }
                     .refreshable {
                         await viewModel.refreshData()
+                        await hunterViewModel.refresh()
                     }
                 }
                 
@@ -76,31 +87,6 @@ struct DashboardView: View {
                         .cornerRadius(12)
                         .shadow(radius: 8)
                         .padding()
-                    }
-                }
-                
-                // Floating Action Button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        
-                        Button(action: {
-                            // Add activity action
-                        }) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.white)
-                                    .frame(width: 56, height: 56)
-                                    .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
-                                
-                                Image(systemName: "plus")
-                                    .font(.system(size: 24, weight: .semibold))
-                                    .foregroundColor(.black)
-                            }
-                        }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 90)
                     }
                 }
             }
@@ -129,6 +115,7 @@ struct DashboardView: View {
             // Initialize and load data when view appears
             print("📱 Dashboard appeared, initializing...")
             await viewModel.initialize()
+            await hunterViewModel.load()
         }
         .onChange(of: selectedDate) { _, newDate in
             Task {
@@ -274,9 +261,6 @@ struct DashboardView: View {
                 .font(.system(size: 28, weight: .bold))
                 .foregroundColor(.primaryText)
             
-            // Daily Outlook
-            DailyOutlookCard()
-            
             // Today's Activities
             if !viewModel.metrics.activities.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
@@ -328,45 +312,6 @@ struct DashboardView: View {
                 .background(Color.cardBackground)
                 .cornerRadius(16)
             }
-            
-            // Action buttons
-            HStack(spacing: 12) {
-                Button(action: {
-                    // Add activity action
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 14, weight: .semibold))
-                        
-                        Text("ADD ACTIVITY")
-                            .font(.system(size: 13, weight: .bold))
-                            .tracking(0.5)
-                    }
-                    .foregroundColor(.secondaryText)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.cardBackground)
-                    .cornerRadius(12)
-                }
-                
-                Button(action: {
-                    // Start activity action
-                }) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "clock")
-                            .font(.system(size: 14, weight: .semibold))
-                        
-                        Text("START ACTIVITY")
-                            .font(.system(size: 13, weight: .bold))
-                            .tracking(0.5)
-                    }
-                    .foregroundColor(.secondaryText)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(Color.cardBackground)
-                    .cornerRadius(12)
-                }
-            }
         }
     }
     
@@ -379,20 +324,6 @@ struct DashboardView: View {
                     .foregroundColor(.primaryText)
                 
                 Spacer()
-                
-                Button(action: {
-                    // Customize action
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 12))
-                        
-                        Text("CUSTOMIZE")
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(0.5)
-                    }
-                    .foregroundColor(.accentBlue)
-                }
             }
             
             // Metric cards
