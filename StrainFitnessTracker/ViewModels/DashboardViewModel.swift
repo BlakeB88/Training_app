@@ -28,9 +28,11 @@ class DashboardViewModel: ObservableObject {
     private let dataSyncService: DataSyncService
     private let repository: MetricsRepository
     private let stressMonitorVM: StressMonitorViewModel
-    
+    private let notificationService = NotificationService.shared
+
     private var cancellables = Set<AnyCancellable>()
     private var hasInitialized = false
+    private var notifiedActivityKeys: Set<String> = []
     
     // MARK: - Initialization
     init(
@@ -116,6 +118,7 @@ class DashboardViewModel: ObservableObject {
         hasInitialized = true
 
         refreshWatchBatteryLevel()
+        await notificationService.checkAuthorizationStatus()
         // Setup observers now that we're initialized
         setupObservers()
         
@@ -351,6 +354,7 @@ class DashboardViewModel: ObservableObject {
         self.metrics = uiMetrics
         self.weekData = uiWeekData
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
+        handleActivityNotifications(for: uiMetrics)
         
         print("✅ Dashboard UI updated with real data")
         // Trigger widget/complication refresh
@@ -377,6 +381,45 @@ class DashboardViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    private func handleActivityNotifications(for metrics: DailyMetrics) {
+        guard Calendar.current.isDateInToday(metrics.date) else {
+            notifiedActivityKeys.removeAll()
+            return
+        }
+
+        guard notificationService.isAuthorized else { return }
+
+        for activity in metrics.activities where shouldNotify(for: activity) {
+            let key = notificationKey(for: activity)
+            guard !notifiedActivityKeys.contains(key) else { continue }
+
+            let score: Double
+            if activity.type == .sleep {
+                score = metrics.sleepScore
+            } else {
+                score = activity.strain ?? metrics.strainScore
+            }
+
+            notificationService.notifyActivityCompletion(activity: activity, score: score)
+            notifiedActivityKeys.insert(key)
+        }
+    }
+
+    private func shouldNotify(for activity: Activity) -> Bool {
+        switch activity.type {
+        case .sleep:
+            return true
+        case .swimming, .running, .cycling, .workout, .walking:
+            return true
+        }
+    }
+
+    private func notificationKey(for activity: Activity) -> String {
+        let start = activity.startTime.timeIntervalSince1970
+        let end = activity.endTime.timeIntervalSince1970
+        return "\(activity.type.rawValue)_\(start)_\(end)"
     }
     
     private func setupObservers() {

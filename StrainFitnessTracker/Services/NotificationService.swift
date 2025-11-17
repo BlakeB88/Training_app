@@ -26,6 +26,7 @@ class NotificationService: ObservableObject {
         case lowRecovery = "low_recovery"
         case workoutReminder = "workout_reminder"
         case sleepReminder = "sleep_reminder"
+        case activityCompletion = "activity_completion"
     }
     
     private init() {}
@@ -110,14 +111,31 @@ class NotificationService: ObservableObject {
         content.title = "Time for Bed"
         content.body = "Get quality sleep to improve your recovery score."
         content.sound = .default
-        
+
         let trigger = UNCalendarNotificationTrigger(dateMatching: time, repeats: true)
         let request = UNNotificationRequest(
             identifier: NotificationIdentifier.sleepReminder.rawValue,
             content: content,
             trigger: trigger
         )
-        
+
+        notificationCenter.add(request)
+    }
+
+    /// Notify when a tracked activity completes with its score
+    func notifyActivityCompletion(activity: Activity, score: Double) {
+        let content = UNMutableNotificationContent()
+        content.title = activityTitle(for: activity)
+        content.body = completionMessage(for: activity, score: score)
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: NotificationIdentifier.activityCompletion.rawValue + "_\(UUID().uuidString)",
+            content: content,
+            trigger: trigger
+        )
+
         notificationCenter.add(request)
     }
     
@@ -143,6 +161,33 @@ class NotificationService: ObservableObject {
             return "🔴 \(Int(recovery))% - Focus on recovery today."
         default:
             return "Recovery data unavailable."
+        }
+    }
+
+    private func activityTitle(for activity: Activity) -> String {
+        switch activity.type {
+        case .sleep:
+            return "Sleep session complete"
+        case .swimming:
+            return "Swim complete"
+        case .running:
+            return "Run complete"
+        case .cycling:
+            return "Ride complete"
+        case .workout:
+            return "Workout complete"
+        case .walking:
+            return "Walk complete"
+        }
+    }
+
+    private func completionMessage(for activity: Activity, score: Double) -> String {
+        switch activity.type {
+        case .sleep:
+            return "Sleep score: \(Int(score))%"
+        default:
+            let formatted = String(format: "%.1f", score)
+            return "Strain score: \(formatted)"
         }
     }
 }
