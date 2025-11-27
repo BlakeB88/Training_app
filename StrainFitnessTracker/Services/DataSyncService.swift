@@ -184,7 +184,8 @@ class DataSyncService: ObservableObject {
         print("📊 Fetching enhanced metrics for \(date.formatted())... (force: \(forceRefresh))")
         
         // 1. Get existing metrics or create new
-        var metrics = (try? repository.fetchDailyMetrics(for: date)) ?? SimpleDailyMetrics(date: date)
+        let previousMetrics = try? repository.fetchDailyMetrics(for: date)
+        var metrics = previousMetrics ?? SimpleDailyMetrics(date: date)
         
         // Check if we should skip fetching (unless force refresh)
         if !forceRefresh {
@@ -333,12 +334,100 @@ class DataSyncService: ObservableObject {
         metrics.timeInLowStress = stressData.timeInLow
         
         metrics.lastUpdated = Date()
-        
+
         print("✅ Enhanced metrics fetched successfully")
         print("   Recovery: \(String(format: "%.1f", recovery ?? 0))")
         print("   Stress: Avg=\(String(format: "%.1f", stressData.average)), Max=\(String(format: "%.1f", stressData.max))")
-        
+
+        sendActivityNotificationsIfNeeded(
+            previousMetrics: previousMetrics,
+            updatedMetrics: metrics
+        )
+
         return metrics
+    }
+
+    // MARK: - Activity Notifications
+
+    private func sendActivityNotificationsIfNeeded(
+        previousMetrics: SimpleDailyMetrics?,
+        updatedMetrics: SimpleDailyMetrics
+    ) {
+        let notificationService = NotificationService.shared
+
+        // Sleep score notification when new sleep is detected
+        if let sleepEnd = updatedMetrics.sleepEnd,
+           let sleepDuration = updatedMetrics.sleepDuration,
+           sleepDuration > 0 {
+
+            let previousSleepEnd = previousMetrics?.sleepEnd
+            let isNewSleepSession: Bool
+
+            if let previousSleepEnd {
+                isNewSleepSession = abs(sleepEnd.timeIntervalSince(previousSleepEnd)) > 60
+            } else {
+                isNewSleepSession = true
+            }
+
+            if isNewSleepSession {
+                let sleepScore = calculateSleepScore(for: updatedMetrics)
+                notificationService.notifySleepScore(
+                    score: sleepScore,
+                    durationHours: sleepDuration
+                )
+            }
+        }
+
+        // Workout notification for newly synced activities
+        let previousWorkoutStartDates = Set(previousMetrics?.workouts.map { $0.startDate } ?? [])
+        let newWorkouts = updatedMetrics.workouts.filter { workout in
+            !previousWorkoutStartDates.contains(workout.startDate)
+        }
+
+        if let latestWorkout = newWorkouts.sorted(by: { $0.startDate < $1.startDate }).last {
+            notificationService.notifyWorkoutCompletion(
+                workout: latestWorkout,
+                totalStrain: updatedMetrics.strain
+            )
+        }
+    }
+
+    /// Mirror the UI sleep score calculation so notifications match the dashboard
+    private func calculateSleepScore(for metrics: SimpleDailyMetrics) -> Double {
+        guard let duration = metrics.sleepDuration else { return 0 }
+
+        var score = 0.0
+        let weights: [String: Double] = [
+            "duration": 0.4,
+            "efficiency": 0.3,
+            "restorative": 0.2,
+            "consistency": 0.1
+        ]
+
+        // Duration score (optimal: 7-9 hours)
+        let durationScore: Double
+        if duration >= 7 && duration <= 9 {
+            durationScore = 100
+        } else if duration < 7 {
+            durationScore = max(0, (duration / 7.0) * 100)
+        } else {
+            durationScore = max(60, 100 - ((duration - 9) * 10))
+        }
+        score += durationScore * weights["duration"]!
+
+        // Efficiency score
+        let efficiencyScore = metrics.sleepEfficiency ?? 70
+        score += efficiencyScore * weights["efficiency"]!
+
+        // Restorative sleep score
+        let restorativeScore = min(100, (metrics.restorativeSleepPercentage ?? 25) * 2.5)
+        score += restorativeScore * weights["restorative"]!
+
+        // Consistency score
+        let consistencyScore = metrics.sleepConsistency ?? 50
+        score += consistencyScore * weights["consistency"]!
+
+        return min(100, max(0, score))
     }
     
     // MARK: - ✅ NEW: Recovery Calculation with Fallback
