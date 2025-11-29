@@ -298,6 +298,7 @@ struct SwimEventPerformance: Identifiable {
     let rank: HunterRank
     let recordDate: Date
     let progressToNextRank: Double
+    let timeToNextRank: TimeInterval?
 
     var displayDistance: String { definition.displayName }
 
@@ -346,5 +347,22 @@ extension TimeInterval {
         } else {
             return String(format: "%d:%02d", minutes, seconds)
         }
+    }
+
+    /// Returns a concise, unit-labeled duration like "15s" or "1.5 min".
+    func shortDurationDescription() -> String {
+        if self < 60 {
+            return "\(Int(ceil(self)))s"
+        }
+
+        if self < 3600 {
+            let minutes = self / 60
+            let formattedMinutes = minutes.formatted(.number.precision(.fractionLength(0...1)))
+            return "\(formattedMinutes) min"
+        }
+
+        let hours = Int(self / 3600)
+        let minutes = Int((self.truncatingRemainder(dividingBy: 3600)) / 60)
+        return "\(hours)h \(minutes)m"
     }
 }

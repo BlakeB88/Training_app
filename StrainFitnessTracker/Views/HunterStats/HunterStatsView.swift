@@ -368,9 +368,15 @@ private struct SwimEventCard: View {
             }
             ProgressView(value: performance.progressToNextRank)
                 .tint(.accentBlue)
-            Text("\(String(format: "%.0f%%", performance.progressToNextRank * 100)) to next rank")
-                .font(.caption2)
-                .foregroundColor(.secondaryText)
+            if let timeToNextRank = performance.timeToNextRank {
+                Text("\(timeToNextRank.shortDurationDescription()) to next rank")
+                    .font(.caption2)
+                    .foregroundColor(.secondaryText)
+            } else {
+                Text("Top rank achieved")
+                    .font(.caption2)
+                    .foregroundColor(.secondaryText)
+            }
         }
         .padding()
         .background(Color.secondaryCardBackground)
