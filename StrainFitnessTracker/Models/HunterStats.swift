@@ -10,6 +10,7 @@ enum HunterRank: String, CaseIterable, Comparable, Codable {
     case A
     case S
     case SPlus
+    case National
 
     var displayName: String {
         switch self {
@@ -19,32 +20,34 @@ enum HunterRank: String, CaseIterable, Comparable, Codable {
             return rawValue
         }
     }
-
     var minimumScore: Double {
         switch self {
         case .E: return 0
         case .D: return 10
         case .C: return 25
         case .B: return 40
-        case .A: return 55
-        case .S: return 70
-        case .SPlus: return 90
+        case .A: return 50
+        case .S: return 65
+        case .SPlus: return 80
+        case .National: return 90
         }
     }
 
     var color: Color {
         switch self {
-        case .E: return .dangerRed
-        case .D: return .warningOrange
-        case .C: return .accentBlue.opacity(0.7)
-        case .B: return .accentBlue
+        case .E: return Color.white
+        case .D: return Color.red
+        case .C: return Color.orange
+        case .B: return Color.yellow
         case .A: return .recoveryGreen
-        case .S: return .recoveryGreen
+        case .S: return Color.blue
         case .SPlus: return Color.purple
+        case .National: return Color.indigo
         }
     }
 
     static func rank(for score: Double) -> HunterRank {
+        if score >= HunterRank.National.minimumScore { return .National }
         if score >= HunterRank.SPlus.minimumScore { return .SPlus }
         if score >= HunterRank.S.minimumScore { return .S }
         if score >= HunterRank.A.minimumScore { return .A }
@@ -59,7 +62,7 @@ enum HunterRank: String, CaseIterable, Comparable, Codable {
     }
 
     var nextRank: HunterRank? {
-        let ordered: [HunterRank] = [.E, .D, .C, .B, .A, .S, .SPlus]
+        let ordered: [HunterRank] = [.E, .D, .C, .B, .A, .S, .SPlus, .National]
         guard let idx = ordered.firstIndex(of: self), idx < ordered.count - 1 else {
             return nil
         }
