@@ -301,6 +301,7 @@ struct SwimEventPerformance: Identifiable {
     let rank: HunterRank
     let recordDate: Date
     let progressToNextRank: Double
+    let timeToNextRank: TimeInterval?
 
     var displayDistance: String { definition.displayName }
 

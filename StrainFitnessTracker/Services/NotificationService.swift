@@ -26,6 +26,8 @@ class NotificationService: ObservableObject {
         case lowRecovery = "low_recovery"
         case workoutReminder = "workout_reminder"
         case sleepReminder = "sleep_reminder"
+        case workoutCompleted = "workout_completed"
+        case sleepScoreReady = "sleep_score_ready"
     }
     
     private init() {}
@@ -118,6 +120,48 @@ class NotificationService: ObservableObject {
             trigger: trigger
         )
         
+        notificationCenter.add(request)
+    }
+
+    /// Notify when a workout is completed with its strain
+    func notifyWorkoutCompletion(workout: WorkoutSummary, totalStrain: Double) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(workout.workoutType.emoji) \(workout.workoutTypeName) Logged"
+        content.body = "Strain: \(workout.strainFormatted) · Daily total: \(totalStrain.formatted(.number.precision(.fractionLength(1))))"
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: NotificationIdentifier.workoutCompleted.rawValue,
+            content: content,
+            trigger: trigger
+        )
+
+        notificationCenter.add(request)
+    }
+
+    /// Notify when a new sleep score is available
+    func notifySleepScore(score: Double, durationHours: Double?) {
+        let roundedScore = Int(score.rounded())
+        let durationText: String
+        if let durationHours = durationHours {
+            durationText = String(format: " · %.1fh slept", durationHours)
+        } else {
+            durationText = ""
+        }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Sleep score ready"
+        content.body = "Score: \(roundedScore)\(durationText)"
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: NotificationIdentifier.sleepScoreReady.rawValue,
+            content: content,
+            trigger: trigger
+        )
+
         notificationCenter.add(request)
     }
     

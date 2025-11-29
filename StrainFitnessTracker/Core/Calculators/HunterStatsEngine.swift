@@ -235,7 +235,12 @@ struct HunterStatsEngine {
                     performanceIndex: 35,
                     rank: HunterRank.rank(for: 35),
                     recordDate: Date().addingTimeInterval(-86400 * 30),
-                    progressToNextRank: 0.4
+                    progressToNextRank: 0.4,
+                    timeToNextRank: timeGapToNextRank(
+                        for: 35,
+                        worldRecordSeconds: def.worldRecordSeconds,
+                        personalRecordSeconds: def.worldRecordSeconds * 1.6
+                    )
                 )
             }
         }
@@ -246,13 +251,19 @@ struct HunterStatsEngine {
             let performanceIndex = max(1, min(100, exp(logScore * 5) * 100))
             let rank = HunterRank.rank(for: performanceIndex)
             let progress = progressToNextRank(for: performanceIndex)
+            let timeGap = timeGapToNextRank(
+                for: performanceIndex,
+                worldRecordSeconds: input.definition.worldRecordSeconds,
+                personalRecordSeconds: input.personalRecordSeconds
+            )
             return SwimEventPerformance(
                 definition: input.definition,
                 personalRecordSeconds: input.personalRecordSeconds,
                 performanceIndex: performanceIndex,
                 rank: rank,
                 recordDate: input.recordDate,
-                progressToNextRank: progress
+                progressToNextRank: progress,
+                timeToNextRank: timeGap
             )
         }
 
@@ -266,6 +277,27 @@ struct HunterStatsEngine {
         guard gap > 0 else { return 0 }
         let progress = (performance - rank.minimumScore) / gap
         return max(0, min(1, progress))
+    }
+
+    private func timeGapToNextRank(
+        for performance: Double,
+        worldRecordSeconds: Double,
+        personalRecordSeconds: Double
+    ) -> TimeInterval? {
+        let rank = HunterRank.rank(for: performance)
+        guard let nextRank = rank.nextRank else { return nil }
+
+        let targetPerformance = nextRank.minimumScore
+        let targetTime = targetTime(for: targetPerformance, worldRecordSeconds: worldRecordSeconds)
+        let gap = personalRecordSeconds - targetTime
+
+        return max(0, gap)
+    }
+
+    private func targetTime(for performanceIndex: Double, worldRecordSeconds: Double) -> TimeInterval {
+        let clampedScore = max(1, min(100, performanceIndex))
+        let ratio = pow(100 / clampedScore, 0.2)
+        return worldRecordSeconds * ratio
     }
 
     // MARK: - XP + Level
