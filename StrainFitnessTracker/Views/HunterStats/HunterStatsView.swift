@@ -135,7 +135,9 @@ private struct HunterRankInfoView: View {
                                 Text(detail.rank.displayName)
                                     .font(.headline)
                                     .foregroundColor(detail.rank.color)
-                                    .frame(width: 44, alignment: .leading)
+                                    .frame(width: 70, alignment: .leading)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.9)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text("\(Int(detail.rank.minimumScore))+")
                                         .font(.caption.bold())
@@ -149,6 +151,7 @@ private struct HunterRankInfoView: View {
                                 }
                             }
                             .padding(10)
+                            .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
                             .background(Color.cardBackground)
                             .cornerRadius(12)
                         }
@@ -185,7 +188,7 @@ private struct HunterRankInfoView: View {
             .navigationTitle("Hunter Guide")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .presentationDetents([.fraction(0.5), .medium])
+        .presentationDetents([.fraction(0.5), .medium, .large])
     }
 }
 
