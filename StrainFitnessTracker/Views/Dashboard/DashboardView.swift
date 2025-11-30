@@ -121,14 +121,8 @@ struct DashboardView: View {
             await viewModel.initialize()
             await hunterViewModel.load()
         }
-        .onChange(of: selectedDate) { _, newDate in
-            Task {
-                print("📅 Date changed to \(newDate)")
-                await viewModel.loadData(for: newDate)
-            }
-        }
     }
-    
+
     // MARK: - Header Section
     private var headerSection: some View {
         HStack(spacing: 12) {
@@ -159,15 +153,15 @@ struct DashboardView: View {
             // Date navigation
             HStack(spacing: 16) {
                 Button(action: {
-                    selectedDate = Calendar.current.date(byAdding: .day, value: -1, to: selectedDate) ?? selectedDate
+                    changeSelectedDate(by: -1)
                 }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(.secondaryText)
                 }
-                
+
                 Button(action: {
-                    selectedDate = Date()
+                    changeSelectedDate(to: Date())
                 }) {
                     Text("TODAY")
                         .font(.system(size: 13, weight: .bold))
@@ -177,9 +171,9 @@ struct DashboardView: View {
                         .background(Color.secondaryCardBackground)
                         .cornerRadius(20)
                 }
-                
+
                 Button(action: {
-                    selectedDate = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+                    changeSelectedDate(by: 1)
                 }) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 14, weight: .semibold))
@@ -403,6 +397,22 @@ struct DashboardView: View {
     private var strainRecoverySection: some View {
         VStack(alignment: .leading, spacing: 0) {
             StrainRecoveryChartView(weekData: viewModel.weekData)
+        }
+    }
+
+    // MARK: - Date Handling
+    private func changeSelectedDate(by days: Int) {
+        let newDate = selectedDate.startOfDay.adding(days: days)
+        changeSelectedDate(to: newDate)
+    }
+
+    private func changeSelectedDate(to date: Date) {
+        let normalizedDate = date.startOfDay
+        selectedDate = normalizedDate
+
+        Task {
+            print("📅 Loading data for \(normalizedDate)")
+            await viewModel.loadData(for: normalizedDate, forceRefresh: true)
         }
     }
 }
