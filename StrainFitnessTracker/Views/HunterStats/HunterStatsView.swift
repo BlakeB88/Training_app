@@ -369,7 +369,7 @@ private struct SwimEventCard: View {
             ProgressView(value: performance.progressToNextRank)
                 .tint(.accentBlue)
             if let timeToNextRank = performance.timeToNextRank {
-                Text("\(timeToNextRank.formattedTime()) to next rank")
+                Text(formattedTimeGap(timeToNextRank))
                     .font(.caption2)
                     .foregroundColor(.secondaryText)
             } else {
@@ -391,6 +391,20 @@ private struct SwimEventCard: View {
             Text(value)
                 .font(.caption.bold())
                 .foregroundColor(.primaryText)
+        }
+    }
+    
+    private func formattedTimeGap(_ seconds: TimeInterval) -> String {
+        let absoluteSeconds = abs(seconds)
+        
+        // For times under 60 seconds, show as seconds with decimal
+        if absoluteSeconds < 60 {
+            return String(format: "Drop %.2fs to next rank", absoluteSeconds)
+        }
+        // For times 60 seconds and over, show as minutes with decimal
+        else {
+            let minutes = absoluteSeconds / 60.0
+            return String(format: "Drop %.2f min to next rank", minutes)
         }
     }
 }
