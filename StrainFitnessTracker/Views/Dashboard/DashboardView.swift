@@ -15,6 +15,10 @@ struct DashboardView: View {
     )
     @StateObject private var hunterViewModel = HunterStatsViewModel()
     @State private var selectedDate = Date()
+
+    private var todaysSleepActivity: Activity? {
+        viewModel.metrics.activities.first { $0.type == .sleep }
+    }
     
     var body: some View {
         NavigationView {
@@ -209,12 +213,31 @@ struct DashboardView: View {
             
             // Circular progress indicators
             HStack(spacing: 30) {
-                CircularProgressView(
-                    title: "Sleep",
-                    value: viewModel.metrics.sleepScore,
-                    color: .sleepBlue
-                )
-                
+                if let sleepActivity = todaysSleepActivity {
+                    NavigationLink(
+                        destination: SleepDetailView(
+                            sleepStart: sleepActivity.startTime,
+                            sleepEnd: sleepActivity.endTime,
+                            sleepDuration: sleepActivity.duration / 3600.0,
+                            sleepData: viewModel.todaysSleepData
+                        )
+                    ) {
+                        CircularProgressView(
+                            title: "Sleep",
+                            value: viewModel.metrics.sleepScore,
+                            color: .sleepBlue,
+                            isInteractive: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    CircularProgressView(
+                        title: "Sleep",
+                        value: viewModel.metrics.sleepScore,
+                        color: .sleepBlue
+                    )
+                }
+
                 NavigationLink(destination: RecoveryDetailView(initialDate: selectedDate)) {
                     CircularProgressView(
                         title: "Recovery",
@@ -223,7 +246,7 @@ struct DashboardView: View {
                         isInteractive: true
                     )
                 }
-                
+
                 NavigationLink(destination: StrainDetailView(initialDate: selectedDate)) {
                     CircularProgressView(
                         title: "Strain",
