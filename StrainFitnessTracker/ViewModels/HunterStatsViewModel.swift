@@ -131,7 +131,7 @@ final class HunterStatsViewModel: ObservableObject {
         let workouts = metrics.flatMap { $0.workouts }
         for workout in workouts where workout.workoutType == .swimming {
             guard let distance = workout.distance, distance > 0 else { continue }
-            guard let definition = SwimEventDefinition.closestMatch(for: distance) else { continue }
+            guard let definition = SwimEventDefinition.closestMatch(for: distance, unit: .meters) else { continue }
             let duration = workout.duration
             if let existing = bestByEvent[definition.distance], existing.personalRecordSeconds <= duration {
                 continue
@@ -152,11 +152,15 @@ final class HunterStatsViewModel: ObservableObject {
 
     private func defaultSwimEvents() -> [SwimEventInput] {
         let today = Date()
+        let freestyle100 = SwimEventDefinition.expandedCatalog.first { $0.displayName == "100m Freestyle" && $0.unit == .meters }
+        let freestyle200 = SwimEventDefinition.expandedCatalog.first { $0.displayName == "200m Freestyle" && $0.unit == .meters }
+        let freestyle800 = SwimEventDefinition.expandedCatalog.first { $0.displayName == "800m Freestyle" && $0.unit == .meters }
+
         return [
-            SwimEventInput(definition: SwimEventDefinition.expandedCatalog[1], personalRecordSeconds: 28.5, recordDate: today.addingTimeInterval(-86400 * 3)),
-            SwimEventInput(definition: SwimEventDefinition.expandedCatalog[2], personalRecordSeconds: 125.0, recordDate: today.addingTimeInterval(-86400 * 10)),
-            SwimEventInput(definition: SwimEventDefinition.expandedCatalog[4], personalRecordSeconds: 520.0, recordDate: today.addingTimeInterval(-86400 * 15))
-        ]
+            freestyle100.map { SwimEventInput(definition: $0, personalRecordSeconds: 28.5, recordDate: today.addingTimeInterval(-86400 * 3)) },
+            freestyle200.map { SwimEventInput(definition: $0, personalRecordSeconds: 125.0, recordDate: today.addingTimeInterval(-86400 * 10)) },
+            freestyle800.map { SwimEventInput(definition: $0, personalRecordSeconds: 520.0, recordDate: today.addingTimeInterval(-86400 * 15)) }
+        ].compactMap { $0 }
     }
 }
 

@@ -19,8 +19,9 @@ struct SwimTimeInputView: View {
                             
                             // Unit Toggle
                             Picker("Unit", selection: $viewModel.selectedUnit) {
-                                Text("Meters").tag(DistanceUnit.meters)
-                                Text("Yards").tag(DistanceUnit.yards)
+                                Text("LCM").tag(DistanceUnit.meters)
+                                Text("SCM").tag(DistanceUnit.shortCourseMeters)
+                                Text("SCY").tag(DistanceUnit.yards)
                             }
                             .pickerStyle(.segmented)
                             .padding(.bottom, 8)
@@ -219,7 +220,7 @@ private struct SwimRecordRow: View {
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(viewModel.getEventName(for: record.eventDistance))
+                Text(viewModel.getEventName(for: record))
                     .font(.headline)
                     .foregroundColor(.primaryText)
                 Text(record.recordDate.formatted(date: .abbreviated, time: .omitted))

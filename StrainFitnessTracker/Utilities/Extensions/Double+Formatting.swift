@@ -111,6 +111,12 @@ extension Double {
             } else {
                 return String(format: "%.0f m", self)
             }
+        case .shortCourseMeters:
+            if self >= 1000 {
+                return String(format: "%.2f km (SC)", self / 1000)
+            } else {
+                return String(format: "%.0f m (SC)", self)
+            }
         case .miles:
             return String(format: "%.2f mi", self)
         case .yards:
@@ -140,8 +146,18 @@ extension Double {
 }
 
 // MARK: - Distance Unit Enum
-enum DistanceUnit {
+enum DistanceUnit: String, Codable, CaseIterable {
     case meters
+    case shortCourseMeters
     case miles
     case yards
+
+    var sortOrder: Int {
+        switch self {
+        case .meters: return 0
+        case .shortCourseMeters: return 1
+        case .yards: return 2
+        case .miles: return 3
+        }
+    }
 }

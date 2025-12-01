@@ -208,7 +208,7 @@ struct SwimEventDefinition: Identifiable, Hashable {
     let worldRecordSeconds: TimeInterval
     let unit: DistanceUnit
 
-    var id: Double { distance }
+    var id: String { "\(unit.rawValue)-\(distance)" }
 
     init(distance: Double, displayName: String, worldRecordSeconds: TimeInterval, unit: DistanceUnit = .meters) {
         self.distance = distance
@@ -217,7 +217,7 @@ struct SwimEventDefinition: Identifiable, Hashable {
         self.unit = unit
     }
 
-    // UPDATED: Expanded catalog with all strokes
+    // UPDATED: Expanded catalog with all strokes and courses
     static let expandedCatalog: [SwimEventDefinition] = [
         // Freestyle (Meters)
         SwimEventDefinition(distance: 50, displayName: "50m Freestyle", worldRecordSeconds: 20.91, unit: .meters),
@@ -227,24 +227,51 @@ struct SwimEventDefinition: Identifiable, Hashable {
         SwimEventDefinition(distance: 800, displayName: "800m Freestyle", worldRecordSeconds: 452.12, unit: .meters),
         SwimEventDefinition(distance: 1500, displayName: "1500m Freestyle", worldRecordSeconds: 870.67, unit: .meters),
 
+        // Freestyle (Short Course Meters)
+        SwimEventDefinition(distance: 50, displayName: "50m Freestyle (SCM)", worldRecordSeconds: 19.90, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 100, displayName: "100m Freestyle (SCM)", worldRecordSeconds: 44.84, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 200, displayName: "200m Freestyle (SCM)", worldRecordSeconds: 98.61, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 400, displayName: "400m Freestyle (SCM)", worldRecordSeconds: 212.25, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 800, displayName: "800m Freestyle (SCM)", worldRecordSeconds: 440.46, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 1500, displayName: "1500m Freestyle (SCM)", worldRecordSeconds: 846.88, unit: .shortCourseMeters),
+
         // Backstroke (Meters)
         SwimEventDefinition(distance: 50.1, displayName: "50m Backstroke", worldRecordSeconds: 23.55, unit: .meters),
         SwimEventDefinition(distance: 100.1, displayName: "100m Backstroke", worldRecordSeconds: 51.60, unit: .meters),
         SwimEventDefinition(distance: 200.1, displayName: "200m Backstroke", worldRecordSeconds: 111.92, unit: .meters),
+
+        // Backstroke (Short Course Meters)
+        SwimEventDefinition(distance: 50.1, displayName: "50m Backstroke (SCM)", worldRecordSeconds: 22.11, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 100.1, displayName: "100m Backstroke (SCM)", worldRecordSeconds: 48.16, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 200.1, displayName: "200m Backstroke (SCM)", worldRecordSeconds: 105.12, unit: .shortCourseMeters),
 
         // Breaststroke (Meters)
         SwimEventDefinition(distance: 50.2, displayName: "50m Breaststroke", worldRecordSeconds: 25.95, unit: .meters),
         SwimEventDefinition(distance: 100.2, displayName: "100m Breaststroke", worldRecordSeconds: 56.88, unit: .meters),
         SwimEventDefinition(distance: 200.2, displayName: "200m Breaststroke", worldRecordSeconds: 125.48, unit: .meters),
 
+        // Breaststroke (Short Course Meters)
+        SwimEventDefinition(distance: 50.2, displayName: "50m Breaststroke (SCM)", worldRecordSeconds: 24.95, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 100.2, displayName: "100m Breaststroke (SCM)", worldRecordSeconds: 55.28, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 200.2, displayName: "200m Breaststroke (SCM)", worldRecordSeconds: 119.52, unit: .shortCourseMeters),
+
         // Butterfly (Meters)
         SwimEventDefinition(distance: 50.3, displayName: "50m Butterfly", worldRecordSeconds: 22.27, unit: .meters),
         SwimEventDefinition(distance: 100.3, displayName: "100m Butterfly", worldRecordSeconds: 49.45, unit: .meters),
         SwimEventDefinition(distance: 200.3, displayName: "200m Butterfly", worldRecordSeconds: 110.34, unit: .meters),
 
+        // Butterfly (Short Course Meters)
+        SwimEventDefinition(distance: 50.3, displayName: "50m Butterfly (SCM)", worldRecordSeconds: 21.32, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 100.3, displayName: "100m Butterfly (SCM)", worldRecordSeconds: 47.68, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 200.3, displayName: "200m Butterfly (SCM)", worldRecordSeconds: 106.85, unit: .shortCourseMeters),
+
         // Individual Medley (Meters)
         SwimEventDefinition(distance: 200.4, displayName: "200m IM", worldRecordSeconds: 112.69, unit: .meters),
         SwimEventDefinition(distance: 400.4, displayName: "400m IM", worldRecordSeconds: 242.50, unit: .meters),
+
+        // Individual Medley (Short Course Meters)
+        SwimEventDefinition(distance: 200.4, displayName: "200m IM (SCM)", worldRecordSeconds: 108.88, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 400.4, displayName: "400m IM (SCM)", worldRecordSeconds: 234.81, unit: .shortCourseMeters),
 
         // Freestyle (Yards - stored offset to keep identifiers unique)
         SwimEventDefinition(distance: 1050, displayName: "50y Freestyle", worldRecordSeconds: 17.63, unit: .yards),
@@ -282,8 +309,17 @@ struct SwimEventDefinition: Identifiable, Hashable {
         SwimEventDefinition(distance: 1500, displayName: "1500m Freestyle", worldRecordSeconds: 870.95)
     ]
 
-    static func closestMatch(for distance: Double) -> SwimEventDefinition? {
-        return expandedCatalog.min(by: { abs($0.distance - distance) < abs($1.distance - distance) })
+    static func closestMatch(for distance: Double, unit: DistanceUnit = .meters) -> SwimEventDefinition? {
+        let candidates = expandedCatalog.filter { $0.unit == unit }
+        let pool = candidates.isEmpty ? expandedCatalog : candidates
+        return pool.min { lhs, rhs in
+            let lhsDiff = abs(lhs.distance - distance)
+            let rhsDiff = abs(rhs.distance - distance)
+            if lhsDiff == rhsDiff {
+                return lhs.unit.sortOrder < rhs.unit.sortOrder
+            }
+            return lhsDiff < rhsDiff
+        }
     }
 }
 
