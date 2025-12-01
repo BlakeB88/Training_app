@@ -248,28 +248,28 @@ struct SwimEventDefinition: Identifiable, Hashable {
 
         // Freestyle (Yards - stored offset to keep identifiers unique)
         SwimEventDefinition(distance: 1050, displayName: "50y Freestyle", worldRecordSeconds: 17.63, unit: .yards),
-        SwimEventDefinition(distance: 1100, displayName: "100y Freestyle", worldRecordSeconds: 39.90, unit: .yards),
+        SwimEventDefinition(distance: 1100, displayName: "100y Freestyle", worldRecordSeconds: 39.83, unit: .yards),
         SwimEventDefinition(distance: 1200, displayName: "200y Freestyle", worldRecordSeconds: 88.33, unit: .yards),
-        SwimEventDefinition(distance: 1500.5, displayName: "500y Freestyle", worldRecordSeconds: 244.45, unit: .yards),
+        SwimEventDefinition(distance: 1500.5, displayName: "500y Freestyle", worldRecordSeconds: 242.31, unit: .yards),
         SwimEventDefinition(distance: 11000, displayName: "1000y Freestyle", worldRecordSeconds: 513.93, unit: .yards),
         SwimEventDefinition(distance: 11650, displayName: "1650y Freestyle", worldRecordSeconds: 852.08, unit: .yards),
 
         // Backstroke (Yards)
-        SwimEventDefinition(distance: 1050.1, displayName: "50y Backstroke", worldRecordSeconds: 20.07, unit: .yards),
-        SwimEventDefinition(distance: 1100.1, displayName: "100y Backstroke", worldRecordSeconds: 43.35, unit: .yards),
-        SwimEventDefinition(distance: 1200.1, displayName: "200y Backstroke", worldRecordSeconds: 95.37, unit: .yards),
+        SwimEventDefinition(distance: 1050.1, displayName: "50y Backstroke", worldRecordSeconds: 20.00, unit: .yards),
+        SwimEventDefinition(distance: 1100.1, displayName: "100y Backstroke", worldRecordSeconds: 43.20, unit: .yards),
+        SwimEventDefinition(distance: 1200.1, displayName: "200y Backstroke", worldRecordSeconds: 94.21, unit: .yards),
 
         // Breaststroke (Yards)
         SwimEventDefinition(distance: 1100.2, displayName: "100y Breaststroke", worldRecordSeconds: 49.51, unit: .yards),
-        SwimEventDefinition(distance: 1200.2, displayName: "200y Breaststroke", worldRecordSeconds: 107.91, unit: .yards),
+        SwimEventDefinition(distance: 1200.2, displayName: "200y Breaststroke", worldRecordSeconds: 106.35, unit: .yards),
 
         // Butterfly (Yards)
         SwimEventDefinition(distance: 1100.3, displayName: "100y Butterfly", worldRecordSeconds: 42.80, unit: .yards),
-        SwimEventDefinition(distance: 1200.3, displayName: "200y Butterfly", worldRecordSeconds: 96.43, unit: .yards),
+        SwimEventDefinition(distance: 1200.3, displayName: "200y Butterfly", worldRecordSeconds: 96.41, unit: .yards),
 
         // Individual Medley (Yards)
-        SwimEventDefinition(distance: 1200.4, displayName: "200y IM", worldRecordSeconds: 97.91, unit: .yards),
-        SwimEventDefinition(distance: 1400.4, displayName: "400y IM", worldRecordSeconds: 213.42, unit: .yards)
+        SwimEventDefinition(distance: 1200.4, displayName: "200y IM", worldRecordSeconds: 96.34, unit: .yards),
+        SwimEventDefinition(distance: 1400.4, displayName: "400y IM", worldRecordSeconds: 208.82, unit: .yards)
     ]
     
     // Keep old catalog for backward compatibility
