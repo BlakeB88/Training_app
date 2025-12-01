@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HunterStatsView: View {
     @StateObject private var viewModel = HunterStatsViewModel()
+    @State private var showRankInfo = false
 
     var body: some View {
         NavigationView {
@@ -13,6 +14,12 @@ struct HunterStatsView: View {
             .toolbarBackground(Color.cardBackground, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showRankInfo = true }) {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundColor(.accentBlue)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
                         viewModel.showSwimTimeInput = true
@@ -25,6 +32,9 @@ struct HunterStatsView: View {
         }
         .task {
             await viewModel.load()
+        }
+        .sheet(isPresented: $showRankInfo) {
+            HunterRankInfoView()
         }
         .sheet(isPresented: $viewModel.showSwimTimeInput) {
             SwimTimeInputView()
@@ -82,6 +92,103 @@ struct HunterStatsView: View {
             }
             .padding()
         }
+    }
+}
+
+// MARK: - Rank Info
+private struct HunterRankInfoView: View {
+    private let rankDetails: [(rank: HunterRank, description: String)] = [
+        (.National, "Elites performing at 90+ scores across categories."),
+        (.SPlus, "Exceptional performance with pro-level balance."),
+        (.S, "Highly trained across strength, endurance, and recovery."),
+        (.A, "Consistent athlete with strong readiness and skill."),
+        (.B, "Solid fundamentals with room to sharpen recovery."),
+        (.C, "Developing baseline capacity across stats."),
+        (.D, "New to training or returning from a break."),
+        (.E, "Starter rank while the system learns your baseline.")
+    ]
+
+    private var xpRules: [String] {
+        [
+            "Daily stat average: every 5 points of the stat grid earns 1 XP.",
+            "Swim mastery: every 4 points of swim mastery adds 1 XP.",
+            "Consistency streak: +1 XP per day on streak (max 15).",
+            "Personal records today: +25 XP bonus for any new swim PR."
+        ]
+    }
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Ranking & Points")
+                        .font(.title2.bold())
+                        .foregroundColor(.primaryText)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Ranks are based on your weighted stat scores. Higher scores move you toward the next letter grade.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondaryText)
+
+                        ForEach(rankDetails, id: \.rank) { detail in
+                            HStack(alignment: .top, spacing: 12) {
+                                Text(detail.rank.displayName)
+                                    .font(.headline)
+                                    .foregroundColor(detail.rank.color)
+                                    .frame(width: 70, alignment: .leading)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.9)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(Int(detail.rank.minimumScore))+")
+                                        .font(.caption.bold())
+                                        .foregroundColor(.secondaryText)
+                                    Text("Requires at least \(Int(detail.rank.minimumScore)) weighted points in your stat grid.")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondaryText)
+                                    Text(detail.description)
+                                        .font(.caption)
+                                        .foregroundColor(.primaryText)
+                                }
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
+                            .background(Color.cardBackground)
+                            .cornerRadius(12)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("How points & levels work")
+                            .font(.headline)
+                            .foregroundColor(.primaryText)
+                        Text("XP rolls up your daily stats, swim mastery, and streaks to push your Hunter level forward.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondaryText)
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(xpRules, id: \.self) { rule in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "checkmark.seal.fill")
+                                        .foregroundColor(.accentBlue)
+                                        .font(.caption)
+                                    Text(rule)
+                                        .font(.caption)
+                                        .foregroundColor(.primaryText)
+                                }
+                            }
+                        }
+                        .padding(12)
+                        .background(Color.cardBackground)
+                        .cornerRadius(12)
+                    }
+                }
+                .padding(20)
+            }
+            .background(Color.appBackground.ignoresSafeArea())
+            .navigationTitle("Hunter Guide")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.fraction(0.5), .medium, .large])
     }
 }
 
@@ -369,7 +476,7 @@ private struct SwimEventCard: View {
             ProgressView(value: performance.progressToNextRank)
                 .tint(.accentBlue)
             if let timeToNextRank = performance.timeToNextRank {
-                Text("\(timeToNextRank.formattedTime()) to next rank")
+                Text(formattedTimeGap(timeToNextRank))
                     .font(.caption2)
                     .foregroundColor(.secondaryText)
             } else {
@@ -391,6 +498,20 @@ private struct SwimEventCard: View {
             Text(value)
                 .font(.caption.bold())
                 .foregroundColor(.primaryText)
+        }
+    }
+    
+    private func formattedTimeGap(_ seconds: TimeInterval) -> String {
+        let absoluteSeconds = abs(seconds)
+        
+        // For times under 60 seconds, show as seconds with decimal
+        if absoluteSeconds < 60 {
+            return String(format: "Drop %.2fs to next rank", absoluteSeconds)
+        }
+        // For times 60 seconds and over, show as minutes with decimal
+        else {
+            let minutes = absoluteSeconds / 60.0
+            return String(format: "Drop %.2f min to next rank", minutes)
         }
     }
 }

@@ -351,7 +351,7 @@ struct SleepDetailView: View {
             .padding(.horizontal, 16)
         }
         .padding(.top, 16)
-        .padding(.bottom, 24)
+        .padding(.bottom, 50)
     }
     
     // MARK: - Sleep Quality Badge
