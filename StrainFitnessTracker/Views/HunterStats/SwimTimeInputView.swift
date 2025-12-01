@@ -19,9 +19,9 @@ struct SwimTimeInputView: View {
                             
                             // Unit Toggle
                             Picker("Unit", selection: $viewModel.selectedUnit) {
-                                Text("Meters").tag(DistanceUnit.meters)
-                                Text("SC Meters").tag(DistanceUnit.shortCourseMeters)
-                                Text("Yards").tag(DistanceUnit.yards)
+                                Text("LCM").tag(DistanceUnit.meters)
+                                Text("SCM").tag(DistanceUnit.shortCourseMeters)
+                                Text("SCY").tag(DistanceUnit.yards)
                             }
                             .pickerStyle(.segmented)
                             .padding(.bottom, 8)

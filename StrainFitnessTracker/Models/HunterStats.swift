@@ -228,11 +228,11 @@ struct SwimEventDefinition: Identifiable, Hashable {
         SwimEventDefinition(distance: 1500, displayName: "1500m Freestyle", worldRecordSeconds: 870.67, unit: .meters),
 
         // Freestyle (Short Course Meters)
-        SwimEventDefinition(distance: 50, displayName: "50m Freestyle (SCM)", worldRecordSeconds: 20.16, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 50, displayName: "50m Freestyle (SCM)", worldRecordSeconds: 19.90, unit: .shortCourseMeters),
         SwimEventDefinition(distance: 100, displayName: "100m Freestyle (SCM)", worldRecordSeconds: 44.84, unit: .shortCourseMeters),
-        SwimEventDefinition(distance: 200, displayName: "200m Freestyle (SCM)", worldRecordSeconds: 99.37, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 200, displayName: "200m Freestyle (SCM)", worldRecordSeconds: 98.61, unit: .shortCourseMeters),
         SwimEventDefinition(distance: 400, displayName: "400m Freestyle (SCM)", worldRecordSeconds: 212.25, unit: .shortCourseMeters),
-        SwimEventDefinition(distance: 800, displayName: "800m Freestyle (SCM)", worldRecordSeconds: 443.42, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 800, displayName: "800m Freestyle (SCM)", worldRecordSeconds: 440.46, unit: .shortCourseMeters),
         SwimEventDefinition(distance: 1500, displayName: "1500m Freestyle (SCM)", worldRecordSeconds: 846.88, unit: .shortCourseMeters),
 
         // Backstroke (Meters)
@@ -242,8 +242,8 @@ struct SwimEventDefinition: Identifiable, Hashable {
 
         // Backstroke (Short Course Meters)
         SwimEventDefinition(distance: 50.1, displayName: "50m Backstroke (SCM)", worldRecordSeconds: 22.11, unit: .shortCourseMeters),
-        SwimEventDefinition(distance: 100.1, displayName: "100m Backstroke (SCM)", worldRecordSeconds: 48.33, unit: .shortCourseMeters),
-        SwimEventDefinition(distance: 200.1, displayName: "200m Backstroke (SCM)", worldRecordSeconds: 105.63, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 100.1, displayName: "100m Backstroke (SCM)", worldRecordSeconds: 48.16, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 200.1, displayName: "200m Backstroke (SCM)", worldRecordSeconds: 105.12, unit: .shortCourseMeters),
 
         // Breaststroke (Meters)
         SwimEventDefinition(distance: 50.2, displayName: "50m Breaststroke", worldRecordSeconds: 25.95, unit: .meters),
@@ -253,7 +253,7 @@ struct SwimEventDefinition: Identifiable, Hashable {
         // Breaststroke (Short Course Meters)
         SwimEventDefinition(distance: 50.2, displayName: "50m Breaststroke (SCM)", worldRecordSeconds: 24.95, unit: .shortCourseMeters),
         SwimEventDefinition(distance: 100.2, displayName: "100m Breaststroke (SCM)", worldRecordSeconds: 55.28, unit: .shortCourseMeters),
-        SwimEventDefinition(distance: 200.2, displayName: "200m Breaststroke (SCM)", worldRecordSeconds: 120.16, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 200.2, displayName: "200m Breaststroke (SCM)", worldRecordSeconds: 119.52, unit: .shortCourseMeters),
 
         // Butterfly (Meters)
         SwimEventDefinition(distance: 50.3, displayName: "50m Butterfly", worldRecordSeconds: 22.27, unit: .meters),
@@ -261,8 +261,8 @@ struct SwimEventDefinition: Identifiable, Hashable {
         SwimEventDefinition(distance: 200.3, displayName: "200m Butterfly", worldRecordSeconds: 110.34, unit: .meters),
 
         // Butterfly (Short Course Meters)
-        SwimEventDefinition(distance: 50.3, displayName: "50m Butterfly (SCM)", worldRecordSeconds: 21.75, unit: .shortCourseMeters),
-        SwimEventDefinition(distance: 100.3, displayName: "100m Butterfly (SCM)", worldRecordSeconds: 48.08, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 50.3, displayName: "50m Butterfly (SCM)", worldRecordSeconds: 21.32, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 100.3, displayName: "100m Butterfly (SCM)", worldRecordSeconds: 47.68, unit: .shortCourseMeters),
         SwimEventDefinition(distance: 200.3, displayName: "200m Butterfly (SCM)", worldRecordSeconds: 106.85, unit: .shortCourseMeters),
 
         // Individual Medley (Meters)
@@ -270,7 +270,7 @@ struct SwimEventDefinition: Identifiable, Hashable {
         SwimEventDefinition(distance: 400.4, displayName: "400m IM", worldRecordSeconds: 242.50, unit: .meters),
 
         // Individual Medley (Short Course Meters)
-        SwimEventDefinition(distance: 200.4, displayName: "200m IM (SCM)", worldRecordSeconds: 109.63, unit: .shortCourseMeters),
+        SwimEventDefinition(distance: 200.4, displayName: "200m IM (SCM)", worldRecordSeconds: 108.88, unit: .shortCourseMeters),
         SwimEventDefinition(distance: 400.4, displayName: "400m IM (SCM)", worldRecordSeconds: 234.81, unit: .shortCourseMeters),
 
         // Freestyle (Yards - stored offset to keep identifiers unique)
