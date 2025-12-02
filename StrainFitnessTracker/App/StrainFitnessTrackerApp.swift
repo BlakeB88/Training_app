@@ -9,9 +9,11 @@ import SwiftUI
 
 @main
 struct StrainFitnessTrackerApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var healthKitManager = HealthKitManager.shared
     @State private var hasRequestedPermissions = false
-    
+    @Environment(\.scenePhase) private var scenePhase
+
     init() {
         print("🚀 App launching...")
     }
@@ -25,8 +27,23 @@ struct StrainFitnessTrackerApp: App {
                         await requestHealthKitPermissions()
                         hasRequestedPermissions = true
                     }
+
+                    // Kick off ML training if we haven't trained today
+                    await MLTrainingScheduler.shared.handleAppForeground()
                 }
                 .environmentObject(healthKitManager)
+                .onChange(of: scenePhase) { phase in
+                    switch phase {
+                    case .active:
+                        Task { @MainActor in
+                            await MLTrainingScheduler.shared.handleAppForeground()
+                        }
+                    case .background:
+                        MLTrainingScheduler.shared.handleAppBackground()
+                    default:
+                        break
+                    }
+                }
         }
     }
     

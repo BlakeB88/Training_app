@@ -123,6 +123,8 @@ class MLTrainingScheduler {
         // Check if we should train
         guard await shouldTrainOnLaunch() else {
             print("ℹ️  Skipping launch training")
+            // Ensure tomorrow's training stays scheduled even if we already trained today
+            scheduleNextTraining()
             return
         }
         
