@@ -47,53 +47,75 @@ struct RecoveryCalculator {
         respiratoryBaseline: Double? = nil
     ) -> Double {
         var components: [(score: Double, weight: Double)] = []
-        
-        // 1. HRV Score (30-35% base weight, adjusted by availability)
+
+        // Track signal quality so we can down-weight the result if we're missing core metrics
+        let expectedCoreSignals = 3.0 // HRV, RHR, Sleep
+        let expectedOptionalSignals = Double((recentStrain != nil ? 1 : 0) + (respiratoryRate != nil ? 1 : 0))
+        var availableSignals = 1.0 // Sleep is always present
+
+        // Resolve baselines and standard deviations so we don't rely on callers to always provide them
+        let resolvedHRVBaseline = hrvBaseline ?? hrvCurrent.map { $0 * 0.95 }
+        let resolvedHRVStdDev = hrvStdDev ?? resolvedHRVBaseline.map { $0 * 0.15 }
+
+        let resolvedRHRBaseline = rhrBaseline ?? rhrCurrent.map { $0 * 1.05 }
+        let resolvedRHRStdDev = rhrStdDev ?? resolvedRHRBaseline.map { $0 * 0.08 }
+
+        // 1. HRV Score (30-35% base weight, softened when using fallback baselines)
         if let current = hrvCurrent,
-           let baseline = hrvBaseline,
-           baseline > 0 {
-            let stdDev = hrvStdDev ?? (baseline * 0.15) // Default 15% if not available
+           let baseline = resolvedHRVBaseline,
+           baseline > 0,
+           let stdDev = resolvedHRVStdDev {
             let hrvScore = calculatePersonalizedHRVScore(
                 current: current,
                 baseline: baseline,
                 stdDev: stdDev
             )
-            components.append((hrvScore, 0.35))
+
+            // Reduce the weight slightly when we have to infer baseline quality
+            let hrvWeight = (hrvBaseline == nil || hrvStdDev == nil) ? 0.30 : 0.35
+            components.append((hrvScore, hrvWeight))
+            availableSignals += 1
         }
-        
+
         // 2. Resting HR Score (25-30% base weight)
         if let current = rhrCurrent,
-           let baseline = rhrBaseline,
-           baseline > 0 {
-            let stdDev = rhrStdDev ?? (baseline * 0.08) // Default 8% if not available
+           let baseline = resolvedRHRBaseline,
+           baseline > 0,
+           let stdDev = resolvedRHRStdDev {
             let rhrScore = calculatePersonalizedRHRScore(
                 current: current,
                 baseline: baseline,
                 stdDev: stdDev
             )
-            components.append((rhrScore, 0.30))
+
+            let rhrWeight = (rhrBaseline == nil || rhrStdDev == nil) ? 0.25 : 0.30
+            components.append((rhrScore, rhrWeight))
+            availableSignals += 1
         }
-        
-        // 3. Multi-Night Sleep Score (20-25% weight)
+
+        // 3. Multi-Night Sleep Score (20-30% weight, scaled up if physiological data is missing)
         let sleepScore = calculateEnhancedSleepScore(
             lastNightDuration: sleepDuration,
             recentNights: recentSleepDurations,
             efficiency: sleepEfficiency,
             consistency: sleepConsistency
         )
-        components.append((sleepScore, 0.20))
-        
-        // 4. Activity/Strain Impact (10-15% weight - negative factor)
+        let sleepWeight = (availableSignals == 1) ? 0.30 : 0.20
+        components.append((sleepScore, sleepWeight))
+
+        // 4. Activity/Strain Impact (8-12% weight - negative factor)
         if let yesterdayStrain = recentStrain {
             let strainScore = calculateStrainRecoveryImpact(
                 recentStrain: yesterdayStrain,
                 acuteStrain: acuteStrain,
                 chronicStrain: chronicStrain
             )
-            components.append((strainScore, 0.10))
+            let strainWeight = (acuteStrain != nil && chronicStrain != nil) ? 0.12 : 0.08
+            components.append((strainScore, strainWeight))
+            availableSignals += 1
         }
-        
-        // 5. Respiratory Rate Score (5% weight)
+
+        // 5. Respiratory Rate Score (up to 5% weight when present)
         if let respRate = respiratoryRate,
            let baseline = respiratoryBaseline ?? getDefaultRespiratoryBaseline() {
             let respScore = calculateRespiratoryScore(
@@ -101,16 +123,23 @@ struct RecoveryCalculator {
                 baseline: baseline
             )
             components.append((respScore, 0.05))
+            availableSignals += 1
         }
-        
+
         // Calculate weighted average
         let totalWeight = components.reduce(0.0) { $0 + $1.weight }
         guard totalWeight > 0 else { return 50.0 }
-        
+
         let weightedSum = components.reduce(0.0) { $0 + ($1.score * $1.weight) }
-        let finalScore = (weightedSum / totalWeight) * 100.0
-        
-        return finalScore.clamped(to: 0...100)
+        let rawScore = (weightedSum / totalWeight) * 100.0
+
+        // Apply a confidence adjustment when we are missing core signals to avoid overconfident scores
+        let expectedSignals = expectedCoreSignals + expectedOptionalSignals
+        let coverage = min(1.0, availableSignals / expectedSignals)
+        let confidence = 0.65 + (coverage * 0.35) // 65-100% confidence band
+        let adjustedScore = (rawScore * confidence) + (50 * (1 - confidence))
+
+        return adjustedScore.clamped(to: 0...100)
     }
     
     // MARK: - Personalized HRV Scoring
@@ -446,8 +475,11 @@ struct RecoveryCalculator {
         sleepDuration: Double,
         respiratoryRate: Double?
     ) -> RecoveryComponents {
+        let resolvedHRVBaseline = hrvBaseline ?? hrvCurrent.map { $0 * 0.95 }
+        let resolvedRHRBaseline = rhrBaseline ?? rhrCurrent.map { $0 * 1.05 }
+
         var hrvScoreValue: Double? = nil
-        if let current = hrvCurrent, let baseline = hrvBaseline, baseline > 0 {
+        if let current = hrvCurrent, let baseline = resolvedHRVBaseline, baseline > 0 {
             let stdDev = baseline * 0.15
             hrvScoreValue = calculatePersonalizedHRVScore(
                 current: current,
@@ -455,9 +487,9 @@ struct RecoveryCalculator {
                 stdDev: stdDev
             ) * 100
         }
-        
+
         var rhrScoreValue: Double? = nil
-        if let current = rhrCurrent, let baseline = rhrBaseline, baseline > 0 {
+        if let current = rhrCurrent, let baseline = resolvedRHRBaseline, baseline > 0 {
             let stdDev = baseline * 0.08
             rhrScoreValue = calculatePersonalizedRHRScore(
                 current: current,
@@ -485,8 +517,8 @@ struct RecoveryCalculator {
             restingHRValue: rhrCurrent,
             sleepDuration: sleepDuration,
             respiratoryRateValue: respiratoryRate,
-            hrvBaseline: hrvBaseline,
-            rhrBaseline: rhrBaseline,
+            hrvBaseline: resolvedHRVBaseline,
+            rhrBaseline: resolvedRHRBaseline,
             date: Date()
         )
     }
