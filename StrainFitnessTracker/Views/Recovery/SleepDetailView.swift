@@ -158,8 +158,6 @@ struct SleepDetailView: View {
                 // Timeline chart
                 sleepStagesChart
 
-                stageLegend
-
                 if let selectedStage = selectedStage {
                     stageSelectionSummary(for: selectedStage)
                         .padding(.horizontal, 16)
@@ -210,149 +208,47 @@ struct SleepDetailView: View {
                     yStart: .value("Stage", stageBand(for: stage.stage).lowerBound),
                     yEnd: .value("Stage", stageBand(for: stage.stage).upperBound)
                 )
-                .foregroundStyle(stageGradient(stage.stage))
-                .cornerRadius(6)
+                .foregroundStyle(stageColor(stage.stage))
+                .cornerRadius(4)
                 .opacity(isStageSelected(stage) ? 1.0 : 0.82)
-                .annotation(position: .overlay, alignment: .center) {
-                    RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.white.opacity(isStageSelected(stage) ? 0.12 : 0.05))
-                        .frame(height: 4)
-                }
             }
 
             if let selectedTime {
                 RuleMark(x: .value("Selected", selectedTime))
                     .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                    .foregroundStyle(Color.white.opacity(0.65))
-                    .annotation(position: .top, alignment: .trailing) {
-                        if let stage = selectedStage {
-                            selectionPill(for: stage)
-                        }
-                    }
+                    .foregroundStyle(Color.secondaryText)
             }
         }
         .chartXAxis(.hidden)
         .chartYAxis(.hidden)
         .chartYScale(domain: 0...4)
         .chartXScale(domain: sleepStart...sleepEnd)
-        .chartPlotStyle { plot in
-            plot
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.02))
-                        .overlay(
-                            LinearGradient(
-                                colors: [Color.sleepBlue.opacity(0.05), Color.clear],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                )
-                .overlay(
-                    VStack(spacing: 0) {
-                        ForEach(0..<4) { _ in
-                            Divider().background(Color.white.opacity(0.06))
-                        }
-                    }
-                )
-        }
         .chartXSelection(value: $selectedTime)
-        .frame(height: 180)
+        .frame(height: 140)
         .padding(.horizontal, 16)
-    }
-
-    private var stageLegend: some View {
-        HStack(spacing: 16) {
-            legendItem(color: stageColor(.asleepDeep), label: "Deep")
-            legendItem(color: stageColor(.asleepCore), label: "Core")
-            legendItem(color: stageColor(.asleepREM), label: "REM")
-            legendItem(color: stageColor(.awake), label: "Awake")
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, -4)
-    }
-
-    private func legendItem(color: Color, label: String) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(color)
-                .frame(width: 10, height: 10)
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(.secondaryText)
-        }
     }
 
     private func stageSelectionSummary(for stage: SleepStage) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
                 Circle()
                     .fill(stageColor(stage.stage))
-                    .frame(width: 12, height: 12)
+                    .frame(width: 10, height: 10)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(stageLabel(for: stage.stage))
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.primaryText)
-
-                    Text("\(formattedTime(stage.startTime)) – \(formattedTime(stageEndTime(for: stage)))")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondaryText)
-                }
-
-                Spacer()
-
-                Text(formatHoursMinutes(stage.duration / 3600))
-                    .font(.system(size: 13, weight: .bold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(stageColor(stage.stage).opacity(0.18))
-                    .foregroundColor(stageColor(stage.stage))
-                    .cornerRadius(10)
-            }
-
-            HStack(spacing: 12) {
-                statChip(icon: "clock.arrow.circlepath", label: "Stage length", value: formatHoursMinutes(stage.duration / 3600))
-                statChip(icon: "arrow.up.left.and.arrow.down.right", label: "Position", value: stageBandLabel(stage.stage))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func statChip(icon: String, label: String, value: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(label)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondaryText)
-                Text(value)
-                    .font(.system(size: 12, weight: .semibold))
+                Text(stageLabel(for: stage.stage))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.primaryText)
             }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color.secondaryCardBackground)
-        .cornerRadius(10)
-    }
 
-    private func selectionPill(for stage: SleepStage) -> some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(stageColor(stage.stage))
-                .frame(width: 8, height: 8)
-            Text(stageLabel(for: stage.stage))
-                .font(.system(size: 11, weight: .medium))
-            Text(formattedTime(stage.startTime))
-                .font(.system(size: 11))
+            Text("\(formattedTime(stage.startTime)) – \(formattedTime(stageEndTime(for: stage)))")
+                .font(.system(size: 12))
+                .foregroundColor(.secondaryText)
+
+            Text("Duration: \(formatHoursMinutes(stage.duration / 3600))")
+                .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.secondaryText)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.ultraThinMaterial)
-        .cornerRadius(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     // MARK: - Sleep Quality Section
@@ -609,15 +505,6 @@ struct SleepDetailView: View {
         }
     }
 
-    private func stageGradient(_ stage: HKCategoryValueSleepAnalysis) -> LinearGradient {
-        let base = stageColor(stage)
-        return LinearGradient(
-            colors: [base.opacity(0.6), base.opacity(0.95)],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-    }
-
     private func stageBand(for stage: HKCategoryValueSleepAnalysis) -> ClosedRange<Double> {
         switch stage {
         case .awake:
@@ -645,16 +532,6 @@ struct SleepDetailView: View {
             return "Core"
         default:
             return "Sleep"
-        }
-    }
-
-    private func stageBandLabel(_ stage: HKCategoryValueSleepAnalysis) -> String {
-        switch stage {
-        case .awake: return "Top band"
-        case .asleepREM: return "Upper-mid"
-        case .asleepCore: return "Mid"
-        case .asleepDeep: return "Low"
-        default: return "Mid"
         }
     }
 
