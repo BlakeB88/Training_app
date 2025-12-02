@@ -153,7 +153,7 @@ struct SleepDetailView: View {
                 .foregroundColor(.secondaryText)
                 .tracking(0.5)
                 .padding(.horizontal, 16)
-            
+
             VStack(spacing: 16) {
                 // Timeline chart
                 sleepStagesChart
@@ -177,9 +177,23 @@ struct SleepDetailView: View {
                 }
                 .padding(.horizontal, 16)
             }
-            .padding(.vertical, 16)
-            .background(Color.cardBackground)
-            .cornerRadius(16)
+            .padding(.vertical, 18)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.cardBackground, Color.cardBackground.opacity(0.9)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                    .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 8)
+            )
+            .cornerRadius(18)
             .padding(.horizontal, 16)
         }
         .padding(.top, 16)
@@ -486,7 +500,7 @@ struct SleepDetailView: View {
         case .asleepREM: return Color.indigo
         case .asleepDeep: return Color.purple
         case .asleepCore: return Color.cyan
-        case .awake: return Color.orange.opacity(0.5)
+        case .awake: return Color.orange.opacity(0.7)
         default: return Color.gray
         }
     }
