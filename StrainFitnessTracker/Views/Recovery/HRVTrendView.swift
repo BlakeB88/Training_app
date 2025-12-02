@@ -3,7 +3,8 @@ import Charts
 
 struct HRVTrendView: View {
     let weeklyData: [(date: Date, hrv: Double)]
-    
+    @State private var selectedData: (date: Date, hrv: Double)?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("HRV Trend")
@@ -33,9 +34,54 @@ struct HRVTrendView: View {
                             )
                             .interpolationMethod(.catmullRom)
                         }
+
+                        if let selected = selectedData {
+                            RuleMark(x: .value("Selected Day", selected.date, unit: .day))
+                                .lineStyle(StrokeStyle(lineWidth: 1, dash: [4]))
+                                .foregroundStyle(.blue.opacity(0.8))
+                                .annotation(position: .top, alignment: .leading) {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(selected.date, format: .dateTime.month(.abbreviated).day())
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text(String(format: "%.0f ms", selected.hrv))
+                                            .font(.caption.bold())
+                                            .foregroundStyle(.primary)
+                                    }
+                                    .padding(8)
+                                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                                }
+
+                            PointMark(
+                                x: .value("Day", selected.date, unit: .day),
+                                y: .value("HRV", selected.hrv)
+                            )
+                            .foregroundStyle(.blue)
+                        }
                     }
                     .frame(height: 200)
                     .chartYScale(domain: 0...maxHRV * 1.2)
+                    .chartOverlay { proxy in
+                        GeometryReader { geometry in
+                            let plotFrame = geometry[proxy.plotAreaFrame]
+                            Rectangle()
+                                .fill(Color.clear)
+                                .contentShape(Rectangle())
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { value in
+                                            let location = value.location
+                                            guard plotFrame.contains(location) else { return }
+
+                                            if let date: Date = proxy.value(atX: location.x) {
+                                                if let closest = weeklyData.min(by: { abs($0.date.timeIntervalSince(date)) < abs($1.date.timeIntervalSince(date)) }) {
+                                                    selectedData = closest
+                                                }
+                                            }
+                                        }
+                                )
+                        }
+                    }
                 } else {
                     // Fallback for older versions
                     SimpleLineChartView(data: weeklyData)
