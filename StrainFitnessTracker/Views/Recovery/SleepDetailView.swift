@@ -15,9 +15,15 @@ struct SleepDetailView: View {
     let sleepEnd: Date
     let sleepDuration: Double // in hours
     let sleepData: HealthKitManager.SleepData?
-    
+
     @State private var sleepStages: [SleepStage] = []
     @State private var isLoadingDetails = true
+    @State private var selectedTime: Date?
+
+    private var selectedStage: SleepStage? {
+        guard let selectedTime else { return nil }
+        return stage(at: selectedTime)
+    }
     
     var body: some View {
         ScrollView {
@@ -147,11 +153,18 @@ struct SleepDetailView: View {
                 .foregroundColor(.secondaryText)
                 .tracking(0.5)
                 .padding(.horizontal, 16)
-            
+
             VStack(spacing: 16) {
                 // Timeline chart
                 sleepStagesChart
-                
+
+                stageLegend
+
+                if let selectedStage = selectedStage {
+                    stageSelectionSummary(for: selectedStage)
+                        .padding(.horizontal, 16)
+                }
+
                 // Time axis labels
                 HStack {
                     Text(sleepStart.formatted(date: .omitted, time: .shortened))
@@ -166,32 +179,180 @@ struct SleepDetailView: View {
                 }
                 .padding(.horizontal, 16)
             }
-            .padding(.vertical, 16)
-            .background(Color.cardBackground)
-            .cornerRadius(16)
+            .padding(.vertical, 18)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.cardBackground, Color.cardBackground.opacity(0.9)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(Color.white.opacity(0.04), lineWidth: 1)
+                    .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 8)
+            )
+            .cornerRadius(18)
             .padding(.horizontal, 16)
         }
         .padding(.top, 16)
     }
-    
+
     private var sleepStagesChart: some View {
-        GeometryReader { geometry in
-            let totalDuration = sleepEnd.timeIntervalSince(sleepStart)
-            
-            HStack(spacing: 0) {
-                ForEach(sleepStages) { stage in
-                    let width = (stage.duration / totalDuration) * geometry.size.width
-                    
-                    Rectangle()
-                        .fill(stageColor(stage.stage))
-                        .frame(width: width)
+        Chart {
+            ForEach(sleepStages) { stage in
+                RectangleMark(
+                    xStart: .value("Start", stage.startTime),
+                    xEnd: .value("End", stage.startTime.addingTimeInterval(stage.duration)),
+                    yStart: .value("Stage", stageBand(for: stage.stage).lowerBound),
+                    yEnd: .value("Stage", stageBand(for: stage.stage).upperBound)
+                )
+                .foregroundStyle(stageGradient(stage.stage))
+                .cornerRadius(6)
+                .opacity(isStageSelected(stage) ? 1.0 : 0.82)
+                .annotation(position: .overlay, alignment: .center) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Color.white.opacity(isStageSelected(stage) ? 0.12 : 0.05))
+                        .frame(height: 4)
                 }
             }
-            .frame(height: 60)
-            .cornerRadius(8)
+
+            if let selectedTime {
+                RuleMark(x: .value("Selected", selectedTime))
+                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 4]))
+                    .foregroundStyle(Color.white.opacity(0.65))
+                    .annotation(position: .top, alignment: .trailing) {
+                        if let stage = selectedStage {
+                            selectionPill(for: stage)
+                        }
+                    }
+            }
         }
-        .frame(height: 60)
+        .chartXAxis(.hidden)
+        .chartYAxis(.hidden)
+        .chartYScale(domain: 0...4)
+        .chartXScale(domain: sleepStart...sleepEnd)
+        .chartPlotStyle { plot in
+            plot
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color.white.opacity(0.02))
+                        .overlay(
+                            LinearGradient(
+                                colors: [Color.sleepBlue.opacity(0.05), Color.clear],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                )
+                .overlay(
+                    VStack(spacing: 0) {
+                        ForEach(0..<4) { _ in
+                            Divider().background(Color.white.opacity(0.06))
+                        }
+                    }
+                )
+        }
+        .chartXSelection(value: $selectedTime)
+        .frame(height: 180)
         .padding(.horizontal, 16)
+    }
+
+    private var stageLegend: some View {
+        HStack(spacing: 16) {
+            legendItem(color: stageColor(.asleepDeep), label: "Deep")
+            legendItem(color: stageColor(.asleepCore), label: "Core")
+            legendItem(color: stageColor(.asleepREM), label: "REM")
+            legendItem(color: stageColor(.awake), label: "Awake")
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, -4)
+    }
+
+    private func legendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.secondaryText)
+        }
+    }
+
+    private func stageSelectionSummary(for stage: SleepStage) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(stageColor(stage.stage))
+                    .frame(width: 12, height: 12)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(stageLabel(for: stage.stage))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.primaryText)
+
+                    Text("\(formattedTime(stage.startTime)) – \(formattedTime(stageEndTime(for: stage)))")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondaryText)
+                }
+
+                Spacer()
+
+                Text(formatHoursMinutes(stage.duration / 3600))
+                    .font(.system(size: 13, weight: .bold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(stageColor(stage.stage).opacity(0.18))
+                    .foregroundColor(stageColor(stage.stage))
+                    .cornerRadius(10)
+            }
+
+            HStack(spacing: 12) {
+                statChip(icon: "clock.arrow.circlepath", label: "Stage length", value: formatHoursMinutes(stage.duration / 3600))
+                statChip(icon: "arrow.up.left.and.arrow.down.right", label: "Position", value: stageBandLabel(stage.stage))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func statChip(icon: String, label: String, value: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondaryText)
+                Text(value)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.primaryText)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color.secondaryCardBackground)
+        .cornerRadius(10)
+    }
+
+    private func selectionPill(for stage: SleepStage) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(stageColor(stage.stage))
+                .frame(width: 8, height: 8)
+            Text(stageLabel(for: stage.stage))
+                .font(.system(size: 11, weight: .medium))
+            Text(formattedTime(stage.startTime))
+                .font(.system(size: 11))
+                .foregroundColor(.secondaryText)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.ultraThinMaterial)
+        .cornerRadius(10)
     }
     
     // MARK: - Sleep Quality Section
@@ -413,6 +574,7 @@ struct SleepDetailView: View {
             
             await MainActor.run {
                 self.sleepStages = stages
+                self.selectedTime = stages.first?.startTime
                 self.isLoadingDetails = false
             }
         } else {
@@ -425,22 +587,94 @@ struct SleepDetailView: View {
     private func formatHoursMinutes(_ hours: Double) -> String {
         let h = Int(hours)
         let minutes = Int((hours - Double(h)) * 60)
-        return "\(h)h \(minutes)m"
+        if h > 0 {
+            return "\(h)h \(minutes)m"
+        }
+        return "\(minutes)m"
     }
-    
+
     private func targetText(_ value: Double, target: Double, isPercentage: Bool) -> String {
         let comparison = value >= target ? "Above" : "Below"
         let targetStr = isPercentage ? "\(Int(target))%" : String(format: "%.1f", target)
         return "\(comparison) target (\(targetStr))"
     }
-    
+
     private func stageColor(_ stage: HKCategoryValueSleepAnalysis) -> Color {
         switch stage {
         case .asleepREM: return Color.indigo
         case .asleepDeep: return Color.purple
         case .asleepCore: return Color.cyan
-        case .awake: return Color.orange.opacity(0.5)
+        case .awake: return Color.orange.opacity(0.7)
         default: return Color.gray
+        }
+    }
+
+    private func stageGradient(_ stage: HKCategoryValueSleepAnalysis) -> LinearGradient {
+        let base = stageColor(stage)
+        return LinearGradient(
+            colors: [base.opacity(0.6), base.opacity(0.95)],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    private func stageBand(for stage: HKCategoryValueSleepAnalysis) -> ClosedRange<Double> {
+        switch stage {
+        case .awake:
+            return 3...4
+        case .asleepREM:
+            return 2...3
+        case .asleepCore:
+            return 1...2
+        case .asleepDeep:
+            return 0...1
+        default:
+            return 1...2
+        }
+    }
+
+    private func stageLabel(for stage: HKCategoryValueSleepAnalysis) -> String {
+        switch stage {
+        case .awake:
+            return "Awake"
+        case .asleepREM:
+            return "REM"
+        case .asleepDeep:
+            return "Deep"
+        case .asleepCore:
+            return "Core"
+        default:
+            return "Sleep"
+        }
+    }
+
+    private func stageBandLabel(_ stage: HKCategoryValueSleepAnalysis) -> String {
+        switch stage {
+        case .awake: return "Top band"
+        case .asleepREM: return "Upper-mid"
+        case .asleepCore: return "Mid"
+        case .asleepDeep: return "Low"
+        default: return "Mid"
+        }
+    }
+
+    private func isStageSelected(_ stage: SleepStage) -> Bool {
+        guard let selectedStage else { return false }
+        return selectedStage.id == stage.id
+    }
+
+    private func formattedTime(_ date: Date) -> String {
+        date.formatted(date: .omitted, time: .shortened)
+    }
+
+    private func stageEndTime(for stage: SleepStage) -> Date {
+        stage.startTime.addingTimeInterval(stage.duration)
+    }
+
+    private func stage(at date: Date) -> SleepStage? {
+        sleepStages.first { stage in
+            let endTime = stageEndTime(for: stage)
+            return stage.startTime...endTime ~= date
         }
     }
 }
