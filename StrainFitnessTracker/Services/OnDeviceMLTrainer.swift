@@ -400,7 +400,17 @@ class OnDeviceMLTrainer: ObservableObject {
 
             "day_of_week": Double(todayFeatures.dayOfWeek),
             "is_weekend": todayFeatures.isWeekend ? 1.0 : 0.0,
-            "is_rest_day": todayFeatures.isRestDay ? 1.0 : 0.0
+            "is_rest_day": todayFeatures.isRestDay ? 1.0 : 0.0,
+
+            // Derived balance & normalization features (must match training schema)
+            "sleep_duration_zscore": todayFeatures.sleepDurationZScore ?? 0.0,
+            "hrv_zscore": todayFeatures.hrvZScore ?? 0.0,
+            "rhr_zscore": todayFeatures.rhrZScore ?? 0.0,
+            "strain_balance": todayFeatures.strainBalance ?? 0.0,
+            "stress_load": todayFeatures.stressLoad ?? 0.0,
+            "recovery_baseline_delta": todayFeatures.recoveryBaselineDelta ?? 0.0,
+            "sleep_to_strain_ratio": todayFeatures.sleepToStrainRatio ?? 0.0,
+            "hrv_to_strain_ratio": todayFeatures.hrvToStrainRatio ?? 0.0
         ]
 
         // 4. Make prediction
