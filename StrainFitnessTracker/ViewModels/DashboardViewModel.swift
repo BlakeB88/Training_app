@@ -30,6 +30,7 @@ class DashboardViewModel: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private var hasInitialized = false
+    private var displayedDate = Date().startOfDay
     
     // MARK: - Initialization
     init(
@@ -178,8 +179,12 @@ class DashboardViewModel: ObservableObject {
         
         print("🔄 Dashboard refresh requested (force: \(forceRefresh))")
         
-        // 1. Sync with HealthKit (now includes force refresh option!)
-        await dataSyncService.quickSync(forceRefresh: forceRefresh)
+        // Keep refreshes scoped to the day currently shown in the dashboard.
+        if Calendar.current.isDateInToday(displayedDate) {
+            await dataSyncService.quickSync(forceRefresh: forceRefresh)
+        } else {
+            await dataSyncService.syncDate(displayedDate, forceRefresh: forceRefresh)
+        }
         
         // 2. Check for errors
         if let syncError = dataSyncService.syncError {
@@ -217,12 +222,14 @@ class DashboardViewModel: ObservableObject {
             needsAuthorization = true
             return
         }
+
+        displayedDate = date.startOfDay
         
         isLoading = true
         errorMessage = nil
         
         // Sync that specific date
-        await dataSyncService.syncDate(date, forceRefresh: forceRefresh)
+        await dataSyncService.syncDate(displayedDate, forceRefresh: forceRefresh)
         
         // Check for sync errors
         if let syncError = dataSyncService.syncError {
@@ -232,7 +239,7 @@ class DashboardViewModel: ObservableObject {
         }
         
         // Load from repository
-        await loadFromRepository(for: date)
+        await loadFromRepository(for: displayedDate)
         
         isLoading = false
     }
@@ -258,7 +265,7 @@ class DashboardViewModel: ObservableObject {
         await dataSyncService.fullSync(days: 7, forceRefresh: true)
         
         // Load fresh data
-        await loadFromRepository()
+        await loadFromRepository(for: displayedDate)
         
         isLoading = false
     }
@@ -299,12 +306,14 @@ class DashboardViewModel: ObservableObject {
     }
     
     private func loadFromRepository(for date: Date = Date()) async {
-        print("📂 Loading from repository for \(date.formatted())...")
+        let normalizedDate = date.startOfDay
+        displayedDate = normalizedDate
+        print("📂 Loading from repository for \(normalizedDate.formatted())...")
         
         // Load today's metrics
-        guard let simpleDailyMetrics = try? repository.fetchDailyMetrics(for: date) else {
+        guard let simpleDailyMetrics = try? repository.fetchDailyMetrics(for: normalizedDate) else {
             // No data yet - this is normal for first launch
-            print("⚠️ No data in repository for \(date.formatted())")
+            print("⚠️ No data in repository for \(normalizedDate.formatted())")
             // Keep showing sample data
             return
         }
@@ -331,8 +340,8 @@ class DashboardViewModel: ObservableObject {
         print("    Last Updated: \(lastUpdated.formatted(date: .omitted, time: .shortened)) (\(minutesAgo) min ago)")
         
         // Load week data
-        let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: date)!
-        let weekMetrics = (try? repository.fetchDailyMetrics(from: weekStart, to: date)) ?? []
+        let weekStart = Calendar.current.date(byAdding: .day, value: -6, to: normalizedDate)!
+        let weekMetrics = (try? repository.fetchDailyMetrics(from: weekStart, to: normalizedDate)) ?? []
         print("  📊 Loaded \(weekMetrics.count) days of week data")
         
         // Convert to UI models
@@ -377,7 +386,8 @@ class DashboardViewModel: ObservableObject {
             .dropFirst()
             .sink { [weak self] _ in
                 Task { @MainActor in
-                    await self?.loadFromRepository()
+                    guard let self else { return }
+                    await self.loadFromRepository(for: self.displayedDate)
                 }
             }
             .store(in: &cancellables)

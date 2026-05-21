@@ -10,15 +10,21 @@ struct StrengthTrainingStrainCalculator {
     static func calculateStrengthTrainingStrain(
         workout: HKWorkout,
         hrProfile: HeartRateProfile,
-        heartRateData: [Double]? = nil
+        heartRateData: [Double]? = nil,
+        durationOverride: Double? = nil,
+        averageHeartRateOverride: Double? = nil,
+        minHeartRateOverride: Double? = nil,
+        caloriesOverride: Double? = nil
     ) -> Double {
-        let duration = workout.durationMinutes
-        let calories = workout.activeCalories
+        let duration = durationOverride ?? workout.durationMinutes
+        let calories = caloriesOverride ?? workout.activeCalories
         guard duration > 0 else { return 0 }
         
         // 1️⃣ Calculate intensity components
         let hrIntensity = calculateHRIntensity(
             heartRateData: heartRateData,
+            averageHeartRateOverride: averageHeartRateOverride,
+            minHeartRateOverride: minHeartRateOverride,
             hrProfile: hrProfile
         )
         
@@ -30,7 +36,7 @@ struct StrengthTrainingStrainCalculator {
         // 2️⃣ Blend intensities (HR weighted more heavily if available)
         let blendedIntensity: Double
         if hrIntensity > 0 {
-            blendedIntensity = hrIntensity * 0.65 + calorieIntensity * 0.35
+            blendedIntensity = hrIntensity * 0.62 + calorieIntensity * 0.38
         } else {
             blendedIntensity = calorieIntensity
         }
@@ -61,23 +67,25 @@ struct StrengthTrainingStrainCalculator {
     /// Accounts for intermittent nature (average HR will be lower than sustained cardio)
     private static func calculateHRIntensity(
         heartRateData: [Double]?,
+        averageHeartRateOverride: Double?,
+        minHeartRateOverride: Double?,
         hrProfile: HeartRateProfile
     ) -> Double {
-        guard let hrData = heartRateData, !hrData.isEmpty else {
+        let averageHeartRate = averageHeartRateOverride
+            ?? heartRateData.flatMap { $0.isEmpty ? nil : $0.reduce(0, +) / Double($0.count) }
+        guard let averageHeartRate else {
             return 0 // Return 0 to signal no HR data (not a default moderate value)
         }
-        
-        let avgHR = hrData.reduce(0, +) / Double(hrData.count)
-        let maxHR = hrProfile.maxHeartRate
-        let restHR = hrProfile.restingHeartRate
-        let hrReserve = maxHR - restHR
-        
-        // Calculate % of HR reserve
-        let percentReserve = (avgHR - restHR) / hrReserve
+
+        let intensity = StrainCalculator.calculateHRIntensity(
+            avgHR: averageHeartRate,
+            minHR: minHeartRateOverride ?? heartRateData?.min(),
+            profile: hrProfile
+        )
         
         // For strength training, 50-60% HR reserve is normal/good
         // Scale accordingly (higher ceiling than raw percentage suggests)
-        switch percentReserve {
+        switch intensity {
         case ..<0.35: // Very light
             return 0.4
         case 0.35..<0.50: // Light to moderate

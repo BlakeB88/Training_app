@@ -19,10 +19,34 @@ extension HKWorkout {
         workoutActivityType == .functionalStrengthTraining
     }
     
-    /// Returns the stroke type for swimming workouts
-    var swimmingStrokeStyle: HKWorkoutSwimmingLocationType? {
+    /// Returns the swimming location type (pool/open water) when available.
+    var swimmingLocationType: HKWorkoutSwimmingLocationType? {
         guard isSwimming else { return nil }
-        return metadata?[HKMetadataKeySwimmingLocationType] as? HKWorkoutSwimmingLocationType
+        if let locationType = metadata?[HKMetadataKeySwimmingLocationType] as? HKWorkoutSwimmingLocationType {
+            return locationType
+        }
+        if let rawValue = metadata?[HKMetadataKeySwimmingLocationType] as? Int {
+            return HKWorkoutSwimmingLocationType(rawValue: rawValue)
+        }
+        if let rawValue = metadata?[HKMetadataKeySwimmingLocationType] as? NSNumber {
+            return HKWorkoutSwimmingLocationType(rawValue: rawValue.intValue)
+        }
+        return nil
+    }
+
+    /// Returns the swimming stroke style when available.
+    var swimmingStrokeStyleMetadata: HKSwimmingStrokeStyle? {
+        guard isSwimming else { return nil }
+        if let strokeStyle = metadata?[HKMetadataKeySwimmingStrokeStyle] as? HKSwimmingStrokeStyle {
+            return strokeStyle
+        }
+        if let rawValue = metadata?[HKMetadataKeySwimmingStrokeStyle] as? Int {
+            return HKSwimmingStrokeStyle(rawValue: rawValue)
+        }
+        if let rawValue = metadata?[HKMetadataKeySwimmingStrokeStyle] as? NSNumber {
+            return HKSwimmingStrokeStyle(rawValue: rawValue.intValue)
+        }
+        return nil
     }
     
     /// Returns average heart rate if available

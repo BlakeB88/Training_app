@@ -209,18 +209,16 @@ class DataSyncService: ObservableObject {
             age: 30 // TODO: Get from user profile
         )
         
-        // Calculate daily strain
-        let strain = await StrainCalculator.calculateDailyStrain(
-            workouts: hkWorkouts,
-            hrProfile: hrProfile
-        )
-        
         // Create workout summaries
         var workoutSummaries: [WorkoutSummary] = []
         for hkWorkout in hkWorkouts {
             let summary = try await createWorkoutSummary(hkWorkout, hrProfile: hrProfile)
             workoutSummaries.append(summary)
         }
+
+        // Calculate daily strain from the effective workout summaries so auto-cutoff
+        // is reflected consistently in both totals and detail screens.
+        let strain = StrainCalculator.combineWorkoutStrains(workoutSummaries.map(\.strain))
         
         // 3. Fetch ENHANCED sleep data
         print("  😴 Fetching detailed sleep data...")
@@ -700,16 +698,33 @@ class DataSyncService: ObservableObject {
     // MARK: - Workout Summary Creation
     
     private func createWorkoutSummary(_ workout: HKWorkout, hrProfile: HeartRateProfile) async throws -> WorkoutSummary {
+        let heartRateSamples = try await workoutQuery.fetchHeartRateSamples(for: workout)
+        let effectiveEndDate = WorkoutAutoCutoff.effectiveEndDate(for: workout, heartRateSamples: heartRateSamples) ?? workout.endDate
+        let trimmedHeartRateSamples = heartRateSamples.filter { $0.date <= effectiveEndDate }
+        let heartRateData = trimmedHeartRateSamples.map(\.heartRate)
+        let effectiveDuration = max(0, effectiveEndDate.timeIntervalSince(workout.startDate))
+        let averageHeartRate = heartRateData.isEmpty ? nil : heartRateData.reduce(0.0, +) / Double(heartRateData.count)
+        let minHeartRate = heartRateData.min()
+
         let workoutStrain = await StrainCalculator.calculateWorkoutStrain(
             workout: workout,
-            hrProfile: hrProfile
+            hrProfile: hrProfile,
+            heartRateData: heartRateData,
+            durationOverride: effectiveDuration,
+            averageHeartRateOverride: averageHeartRate,
+            minHeartRateOverride: minHeartRate,
+            distanceOverride: workout.totalDistance?.doubleValue(for: .meter())
         )
-        
-        let heartRateData = try await workoutQuery.fetchHeartRateData(for: workout)
-        let avgHR = heartRateData.isEmpty ? nil : heartRateData.reduce(0.0, +) / Double(heartRateData.count)
+        let avgHR = averageHeartRate
         let maxHR = heartRateData.max()
         
-        let intensity = avgHR.map { StrainCalculator.calculateHRIntensity(avgHR: $0, profile: hrProfile) }
+        let intensity = avgHR.map {
+            StrainCalculator.calculateHRIntensity(
+                avgHR: $0,
+                minHR: minHeartRate,
+                profile: hrProfile
+            )
+        }
         
         let calories: Double
         if let energyType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned),
@@ -724,8 +739,8 @@ class DataSyncService: ObservableObject {
             id: UUID(),
             workoutType: workout.workoutActivityType,
             startDate: workout.startDate,
-            endDate: workout.endDate,
-            duration: workout.duration,
+            endDate: effectiveEndDate,
+            duration: effectiveDuration,
             distance: workout.totalDistance?.doubleValue(for: .meter()),
             calories: calories,
             averageHeartRate: avgHR,

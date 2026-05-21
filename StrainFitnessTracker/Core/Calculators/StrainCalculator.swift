@@ -20,15 +20,18 @@ struct StrainCalculator {
         workouts: [HKWorkout],
         hrProfile: HeartRateProfile
     ) async -> Double {
-        var totalStrain = 0.0
+        var workoutStrains: [Double] = []
         
         for workout in workouts {
             let workoutStrain = await calculateWorkoutStrain(workout: workout, hrProfile: hrProfile)
-            totalStrain += workoutStrain
+            workoutStrains.append(workoutStrain)
         }
         
-        // Cap at 21 (theoretical maximum, aligned with Whoop)
-        return min(totalStrain, 21.0)
+        // Combine with diminishing returns so multiple workouts always increase total,
+        // but low-strain workouts only add a little.
+        // Formula: total = 21 * (1 - Π(1 - s_i/21))
+        // This mirrors "remaining capacity" accumulation and avoids easy saturation.
+        return combineWorkoutStrains(workoutStrains)
     }
     
     /// Calculate strain for a single workout
@@ -38,13 +41,28 @@ struct StrainCalculator {
     /// - Returns: Strain score for this workout
     static func calculateWorkoutStrain(
         workout: HKWorkout,
-        hrProfile: HeartRateProfile
+        hrProfile: HeartRateProfile,
+        heartRateData: [Double]? = nil,
+        durationOverride: TimeInterval? = nil,
+        averageHeartRateOverride: Double? = nil,
+        minHeartRateOverride: Double? = nil,
+        caloriesOverride: Double? = nil,
+        distanceOverride: Double? = nil
     ) async -> Double {
+        let durationMinutes = (durationOverride ?? workout.duration) / 60.0
+        let calories = caloriesOverride ?? workout.activeCalories
+
         // Special handling for swimming
         if workout.isSwimming {
             return SwimmingStrainCalculator.calculateSwimmingStrain(
                 workout: workout,
-                hrProfile: hrProfile
+                hrProfile: hrProfile,
+                heartRateData: heartRateData,
+                durationOverride: durationMinutes,
+                caloriesOverride: calories,
+                distanceOverride: distanceOverride,
+                averageHeartRateOverride: averageHeartRateOverride,
+                minHeartRateOverride: minHeartRateOverride
             )
         }
         
@@ -52,45 +70,93 @@ struct StrainCalculator {
         if workout.isStrengthTraining {
             return StrengthTrainingStrainCalculator.calculateStrengthTrainingStrain(
                 workout: workout,
-                hrProfile: hrProfile
+                hrProfile: hrProfile,
+                heartRateData: heartRateData,
+                durationOverride: durationMinutes,
+                averageHeartRateOverride: averageHeartRateOverride,
+                minHeartRateOverride: minHeartRateOverride,
+                caloriesOverride: calories
             )
         }
         
         // Get workout metrics for other activity types
-        let duration = workout.durationMinutes
-        let calories = workout.activeCalories
+        let duration = durationMinutes
         
         // Try to get heart rate data
-        let hrIntensity: Double
-        if let avgHR = workout.averageHeartRate {
-            hrIntensity = calculateHRIntensity(avgHR: avgHR, profile: hrProfile)
+        let avgHR = averageHeartRateOverride
+            ?? heartRateData.flatMap { $0.isEmpty ? nil : $0.reduce(0, +) / Double($0.count) }
+            ?? workout.averageHeartRate
+        let minHR = minHeartRateOverride ?? heartRateData?.min()
+
+        if let avgHR {
+            let hrIntensity = calculateHRIntensity(
+                avgHR: avgHR,
+                minHR: minHR,
+                profile: hrProfile
+            )
+            let rawStrain = calculateHeartRateBiasedStrain(
+                hrIntensity: hrIntensity,
+                duration: duration,
+                calories: calories
+            )
+            return min(rawStrain, 21.0)
         } else {
             // Fallback: estimate from calories and duration
-            hrIntensity = estimateIntensityFromCalories(
+            let hrIntensity = estimateIntensityFromCalories(
                 calories: calories,
                 duration: duration,
                 workoutType: workout.workoutActivityType
             )
+            
+            // Preserve the original fallback behavior when HR data is unavailable.
+            let rawStrain = log2(hrIntensity * duration + calories * 0.3 + 1) * 3
+            return min(rawStrain, 21.0)
         }
-        
-        // Strain formula: log₂(HR_Intensity × Duration + Calories × 0.3 + 1) × 3
-        // Aligned with Whoop's logarithmic nature for diminishing returns at higher levels
-        let rawStrain = log2(hrIntensity * duration + calories * 0.3 + 1) * 3
-        
-        return min(rawStrain, 21.0)
+    }
+
+    static func combineWorkoutStrains(_ strains: [Double]) -> Double {
+        let combined = 21.0 * (1.0 - strains.reduce(1.0) { acc, strain in
+            let clamped = min(max(strain, 0.0), 21.0)
+            return acc * (1.0 - clamped / 21.0)
+        })
+
+        return min(combined, 21.0)
     }
     
     /// Calculate heart rate intensity relative to user's zones
-    static func calculateHRIntensity(avgHR: Double, profile: HeartRateProfile) -> Double {
+    static func calculateHRIntensity(
+        avgHR: Double,
+        minHR: Double? = nil,
+        profile: HeartRateProfile
+    ) -> Double {
         let maxHR = profile.maxHeartRate
         let restingHR = profile.restingHeartRate
         let hrReserve = maxHR - restingHR
+        guard hrReserve > 0 else { return 0 }
         
-        // Karvonen formula for intensity (% of HR reserve)
-        let intensity = (avgHR - restingHR) / hrReserve
-        
-        // Whoop-like scaling: emphasize time in higher zones
-        return intensity * 1.2 // Slight boost for alignment with Whoop averages
+        let avgReserve = max(0, min(1.25, (avgHR - restingHR) / hrReserve))
+        let avgComponent = pow(avgReserve, 0.8) * 1.1
+
+        guard let minHR else {
+            return max(0, min(1.25, avgComponent))
+        }
+
+        let minReserve = max(0, min(1.0, (minHR - restingHR) / hrReserve))
+        let intensity = avgComponent * 0.95 + minReserve * 0.05
+
+        return max(0, min(1.25, intensity))
+    }
+
+    private static func calculateHeartRateBiasedStrain(
+        hrIntensity: Double,
+        duration: Double,
+        calories: Double
+    ) -> Double {
+        let cappedIntensity = max(0, min(hrIntensity, 1.25))
+        let hrLoad = pow(cappedIntensity, 1.35) * duration * 1.35
+        let supportingLoad = calories * 0.22
+
+        return log2(hrLoad + supportingLoad + 1) * 3
     }
     
     /// Estimate intensity from calories when HR data unavailable

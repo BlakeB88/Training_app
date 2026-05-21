@@ -431,7 +431,7 @@ struct StrainDetailView: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 BulletPoint(
-                    text: "Swimming: Heart rate intensity (85%) + pace/calories (15%), with linear duration scaling for endurance work"
+                    text: "Swimming: Heart rate intensity is the primary driver, especially for pool swims; open-water swims still use pace as a secondary signal"
                 )
                 
                 BulletPoint(
