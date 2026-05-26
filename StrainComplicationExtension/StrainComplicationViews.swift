@@ -1,11 +1,27 @@
 import SwiftUI
 import WidgetKit
 
+// MARK: - Colors (local — can't import main app's Color extension)
+private let recoveryGreen = Color(red: 0.196, green: 0.843, blue: 0.294) // #32D74B
+private let strainBlue    = Color(red: 0.30,  green: 0.55,  blue: 1.0)
+
+// MARK: - Strain formatter (shows "12.7", not "61%")
+private func formatStrain(_ raw: Double?) -> String {
+    guard let raw else { return "--" }
+    // Drop decimal if it's a whole number
+    return raw.truncatingRemainder(dividingBy: 1) == 0
+        ? String(format: "%.0f", raw)
+        : String(format: "%.1f", raw)
+}
+
+// MARK: - Entry View
+
 struct StrainComplicationEntryView: View {
     var entry: StrainComplicationProvider.Entry
     @Environment(\.widgetFamily) var family
-    
+
     var body: some View {
+        let _ = print("🟡 [Complication] StrainComplicationEntryView.body — family: \(family), hasData: \(entry.hasData)")
         switch family {
         case .accessoryCircular:
             CircularComplicationView(entry: entry)
@@ -14,59 +30,50 @@ struct StrainComplicationEntryView: View {
         case .accessoryInline:
             InlineComplicationView(entry: entry)
         default:
-            EmptyView()
+            let _ = print("🔴 [Complication] Unexpected family: \(family)")
+            Text("?")
         }
     }
 }
 
-// MARK: - Circular Complication (for Modular face small)
+// MARK: - Circular Complication
 
 struct CircularComplicationView: View {
     let entry: StrainComplicationEntry
-    
+
     var body: some View {
         if entry.hasData {
             ZStack {
-                // Recovery ring (outer)
+                // Recovery ring (outer) — green
                 Circle()
                     .trim(from: 0, to: CGFloat(entry.recovery ?? 0) / 100)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.cyan, Color.green],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                    )
+                    .stroke(recoveryGreen,
+                            style: StrokeStyle(lineWidth: 7, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                
-                // Strain ring (inner)
+
+                // Strain ring (inner) — blue
                 Circle()
                     .trim(from: 0, to: CGFloat(entry.strain ?? 0) / 100)
-                    .stroke(
-                        LinearGradient(
-                            colors: [Color.blue, Color.purple],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 4, lineCap: .round)
-                    )
+                    .stroke(strainBlue,
+                            style: StrokeStyle(lineWidth: 5, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .padding(8)
-                
-                // Center value (strain)
+                    .padding(10)
+
+                // Center — raw strain value
                 VStack(spacing: 0) {
-                    Text("\(entry.strain ?? 0)")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                    Text(formatStrain(entry.strainRaw))
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(strainBlue)
+                        .minimumScaleFactor(0.7)
                     Text("strain")
-                        .font(.system(size: 8))
+                        .font(.system(size: 7, weight: .medium))
                         .foregroundColor(.secondary)
                 }
             }
         } else {
-            VStack {
+            VStack(spacing: 2) {
                 Image(systemName: "bolt.heart.fill")
-                    .font(.title2)
+                    .font(.title3)
                 Text("--")
                     .font(.caption2)
             }
@@ -74,116 +81,82 @@ struct CircularComplicationView: View {
     }
 }
 
-// MARK: - Rectangular Complication (for Modular face large)
+// MARK: - Rectangular Complication
 
 struct RectangularComplicationView: View {
     let entry: StrainComplicationEntry
-    
+
     var body: some View {
         if entry.hasData {
-            VStack(alignment: .leading, spacing: 4) {
-                // Header
-                HStack {
-                    Image(systemName: "bolt.heart.fill")
-                        .font(.caption)
-                    Text("Fit Tracker")
-                        .font(.caption)
-                        .fontWeight(.semibold)
+            HStack(spacing: 8) {
+                // Recovery column
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Recovery")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+
+                    Text("\(entry.recovery ?? 0)%")
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundColor(recoveryGreen)
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
+
+                    // Mini ring
+                    MiniRing(progress: Double(entry.recovery ?? 0) / 100, color: recoveryGreen)
                 }
-                .foregroundColor(.secondary)
-                
-                // Metrics
-                HStack(spacing: 12) {
-                    // Recovery
-                    MetricRow(
-                        label: "Recovery",
-                        value: entry.recovery ?? 0,
-                        color: .green
-                    )
-                    
-                    Divider()
-                    
-                    // Strain
-                    MetricRow(
-                        label: "Strain",
-                        value: entry.strain ?? 0,
-                        color: .purple
-                    )
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 1)
+                    .padding(.vertical, 4)
+
+                // Strain column
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Strain")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+
+                    Text(formatStrain(entry.strainRaw))
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .foregroundColor(strainBlue)
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
+
+                    // Mini ring — still fills by percentage, shows raw as text
+                    MiniRing(progress: Double(entry.strain ?? 0) / 100, color: strainBlue)
                 }
-                
-                // Optional: Exertion bar
-                if let exertion = entry.exertion {
-                    HStack(spacing: 4) {
-                        Text("Exertion")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                        
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(Color.gray.opacity(0.3))
-                                
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [.blue, .purple],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: geometry.size.width * CGFloat(exertion) / 100)
-                            }
-                        }
-                        .frame(height: 4)
-                        
-                        Text("\(exertion)%")
-                            .font(.system(size: 10, weight: .medium))
-                            .monospacedDigit()
-                    }
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.vertical, 4)
+            .padding(.horizontal, 2)
         } else {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Image(systemName: "bolt.heart.fill")
-                    Text("Fit Tracker")
-                }
-                .font(.caption)
-                .foregroundColor(.secondary)
-                
+            HStack {
+                Image(systemName: "bolt.heart.fill")
                 Text("No data available")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
             }
+            .font(.caption)
+            .foregroundColor(.secondary)
         }
     }
 }
 
-struct MetricRow: View {
-    let label: String
-    let value: Int
+// MARK: - Shared mini ring indicator
+
+struct MiniRing: View {
+    let progress: Double
     let color: Color
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-            
-            HStack(spacing: 4) {
-                Text("\(value)%")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(color)
-                
-                // Small gauge indicator
-                Circle()
-                    .trim(from: 0, to: CGFloat(value) / 100)
-                    .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                    .frame(width: 12, height: 12)
-                    .rotationEffect(.degrees(-90))
-            }
+        ZStack {
+            Circle()
+                .stroke(color.opacity(0.25), lineWidth: 3)
+            Circle()
+                .trim(from: 0, to: CGFloat(progress))
+                .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .rotationEffect(.degrees(-90))
         }
+        .frame(width: 16, height: 16)
     }
 }
 
@@ -191,22 +164,14 @@ struct MetricRow: View {
 
 struct InlineComplicationView: View {
     let entry: StrainComplicationEntry
-    
+
     var body: some View {
         if entry.hasData {
-            HStack(spacing: 6) {
-                Image(systemName: "bolt.heart.fill")
-                Text("R: \(entry.recovery ?? 0)%")
-                Text("•")
-                Text("S: \(entry.strain ?? 0)%")
-            }
-            .font(.caption2)
+            Text("R:\(entry.recovery ?? 0)%  S:\(formatStrain(entry.strainRaw))")
+                .font(.caption2)
         } else {
-            HStack {
-                Image(systemName: "bolt.heart.fill")
-                Text("No data")
-            }
-            .font(.caption2)
+            Label("No data", systemImage: "bolt.heart.fill")
+                .font(.caption2)
         }
     }
 }
@@ -217,24 +182,16 @@ struct StrainComplicationEntryView_Previews: PreviewProvider {
     static var previews: some View {
         Group {
             StrainComplicationEntryView(
-                entry: StrainComplicationEntry(
-                    date: Date(),
-                    recovery: 75,
-                    strain: 45,
-                    exertion: 66
-                )
+                entry: StrainComplicationEntry(date: Date(), recovery: 54, strain: 60, strainRaw: 12.7, exertion: nil)
             )
+            .containerBackground(.black, for: .widget)
             .previewContext(WidgetPreviewContext(family: .accessoryCircular))
             .previewDisplayName("Circular")
-            
+
             StrainComplicationEntryView(
-                entry: StrainComplicationEntry(
-                    date: Date(),
-                    recovery: 75,
-                    strain: 45,
-                    exertion: 66
-                )
+                entry: StrainComplicationEntry(date: Date(), recovery: 54, strain: 60, strainRaw: 12.7, exertion: nil)
             )
+            .containerBackground(.black, for: .widget)
             .previewContext(WidgetPreviewContext(family: .accessoryRectangular))
             .previewDisplayName("Rectangular")
         }

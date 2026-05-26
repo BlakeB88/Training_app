@@ -1,41 +1,56 @@
 import Foundation
 import HealthKit
 
-struct WorkoutAutoCutoff {
-    static let lowHeartRateThreshold = 120.0
-    static let sustainedLowHeartRateDuration: TimeInterval = 10 * 60
-    static let recoveryBuffer: TimeInterval = 5 * 60
+// MARK: - Detection Result
 
-    static func effectiveEndDate(
+/// Returned when the auto-cutoff algorithm finds a sustained low-HR period.
+struct CutoffDetection {
+    /// The recommended workout end time (5 min after HR first dropped).
+    let suggestedEndDate: Date
+    /// The timestamp when heart rate first fell below the threshold.
+    let lowHRStartDate: Date
+}
+
+// MARK: - Auto Cutoff
+
+struct WorkoutAutoCutoff {
+    /// Heart rate below this value (bpm) is considered "low" for this workout type.
+    static let lowHeartRateThreshold = 95.0
+    /// How long HR must stay below the threshold before a cutoff is suggested.
+    static let sustainedLowHeartRateDuration: TimeInterval = 10 * 60  // 10 min
+    /// Buffer added after the low-HR start to produce the suggested end time.
+    static let recoveryBuffer: TimeInterval = 5 * 60                   // 5 min
+
+    /// Returns a `CutoffDetection` if a sustained low-HR period is found,
+    /// `nil` if the full workout duration looks legitimate.
+    static func detectCutoff(
         for workout: HKWorkout,
         heartRateSamples: [(date: Date, heartRate: Double)]
-    ) -> Date? {
+    ) -> CutoffDetection? {
         guard !heartRateSamples.isEmpty else { return nil }
 
         let sortedSamples = heartRateSamples.sorted { $0.date < $1.date }
-        var lowHeartRateStart: Date?
+        var lowHRStart: Date?
 
         for sample in sortedSamples {
-            guard sample.date >= workout.startDate && sample.date <= workout.endDate else {
-                continue
-            }
+            guard sample.date >= workout.startDate && sample.date <= workout.endDate else { continue }
 
             if sample.heartRate < lowHeartRateThreshold {
-                if lowHeartRateStart == nil {
-                    lowHeartRateStart = sample.date
-                }
+                if lowHRStart == nil { lowHRStart = sample.date }
 
-                if let lowHeartRateStart,
-                   sample.date.timeIntervalSince(lowHeartRateStart) >= sustainedLowHeartRateDuration {
-                    let bufferedEndDate = lowHeartRateStart.addingTimeInterval(recoveryBuffer)
-                    guard bufferedEndDate < workout.endDate else { return nil }
-                    return max(bufferedEndDate, workout.startDate)
+                if let start = lowHRStart,
+                   sample.date.timeIntervalSince(start) >= sustainedLowHeartRateDuration {
+                    let suggested = start.addingTimeInterval(recoveryBuffer)
+                    guard suggested < workout.endDate else { return nil }
+                    return CutoffDetection(
+                        suggestedEndDate: max(suggested, workout.startDate),
+                        lowHRStartDate: start
+                    )
                 }
             } else {
-                lowHeartRateStart = nil
+                lowHRStart = nil
             }
         }
-
         return nil
     }
 }

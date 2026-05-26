@@ -5,6 +5,7 @@
 //  On-device ML training that updates daily as you collect more data
 //
 
+#if canImport(CreateML)
 import Foundation
 import CreateML
 import CoreML
@@ -31,7 +32,12 @@ class OnDeviceMLTrainer: ObservableObject {
     private let userDefaults = UserDefaults.standard
     private let lastTrainingKey = "lastMLTrainingDate"
     private let modelVersionKey = "mlModelVersion"
+    private let schemaVersionKey = "mlModelSchemaVersion"
     private let minimumDataPoints = 14 // Need at least 2 weeks
+
+    /// Bump this whenever the training feature set changes.
+    /// On first launch after a bump the stale compiled model is deleted automatically.
+    private let currentSchemaVersion = 2
     
     // Model file paths
     private var modelURL: URL {
@@ -47,6 +53,23 @@ class OnDeviceMLTrainer: ObservableObject {
     private init() {
         self.lastTrainingDate = userDefaults.object(forKey: lastTrainingKey) as? Date
         self.modelVersion = userDefaults.integer(forKey: modelVersionKey)
+
+        // If the stored schema version doesn't match the current one, the compiled
+        // model on disk is stale — delete it so a fresh retrain is triggered.
+        let storedSchema = userDefaults.integer(forKey: schemaVersionKey)
+        if storedSchema != currentSchemaVersion {
+            deleteStaleModel()
+            userDefaults.set(currentSchemaVersion, forKey: schemaVersionKey)
+        }
+    }
+
+    private func deleteStaleModel() {
+        try? FileManager.default.removeItem(at: compiledModelURL)
+        lastTrainingDate = nil
+        modelVersion = 0
+        userDefaults.removeObject(forKey: lastTrainingKey)
+        userDefaults.set(0, forKey: modelVersionKey)
+        print("🗑️ Stale model deleted — schema bumped to v\(currentSchemaVersion), retrain required")
     }
     
     // MARK: - Main Training Function
@@ -150,22 +173,27 @@ class OnDeviceMLTrainer: ObservableObject {
         
         // Target variable
         dataFrame.append(column: Column(name: "tomorrow_recovery", contents: metrics.map { $0.tomorrowRecovery ?? 0.0 }))
-        
+
+        // Today's recovery (strongest single predictor of tomorrow's)
+        dataFrame.append(column: Column(name: "today_recovery", contents: metrics.map { $0.todayRecovery ?? 70.0 }))
+
         // Sleep features
         dataFrame.append(column: Column(name: "sleep_duration", contents: metrics.map { $0.sleepDuration ?? 0.0 }))
         dataFrame.append(column: Column(name: "sleep_efficiency", contents: metrics.map { $0.sleepEfficiency ?? 0.0 }))
         dataFrame.append(column: Column(name: "restorative_sleep_pct", contents: metrics.map { $0.restorativeSleepPercentage ?? 0.0 }))
         dataFrame.append(column: Column(name: "sleep_debt", contents: metrics.map { $0.sleepDebt ?? 0.0 }))
+        dataFrame.append(column: Column(name: "sleep_debt_7d", contents: metrics.map { $0.sleepDebtLast7Days ?? $0.sleepDebt ?? 0.0 }))
         dataFrame.append(column: Column(name: "sleep_consistency", contents: metrics.map { $0.sleepConsistency ?? 0.0 }))
         dataFrame.append(column: Column(name: "avg_sleep_7d", contents: metrics.map { $0.avgSleepLast7Days ?? $0.sleepDuration ?? 8.0 }))
-        
-        // Physiological features
+        dataFrame.append(column: Column(name: "bedtime_consistency", contents: metrics.map { $0.bedtimeConsistency ?? 0.0 }))
+        dataFrame.append(column: Column(name: "wake_time_consistency", contents: metrics.map { $0.wakeTimeConsistency ?? 0.0 }))
+
+        // Physiological features (hrv_deviation & rhr_deviation removed — z-scores cover the same signal)
         dataFrame.append(column: Column(name: "hrv", contents: metrics.map { $0.hrvAverage ?? 0.0 }))
-        dataFrame.append(column: Column(name: "hrv_deviation", contents: metrics.map { $0.hrvDeviation ?? 0.0 }))
         dataFrame.append(column: Column(name: "rhr", contents: metrics.map { $0.restingHeartRate ?? 60.0 }))
-        dataFrame.append(column: Column(name: "rhr_deviation", contents: metrics.map { $0.rhrDeviation ?? 0.0 }))
         dataFrame.append(column: Column(name: "avg_hrv_7d", contents: metrics.map { $0.avgHRVLast7Days ?? $0.hrvAverage ?? 0.0 }))
         dataFrame.append(column: Column(name: "avg_rhr_7d", contents: metrics.map { $0.avgRHRLast7Days ?? $0.restingHeartRate ?? 60.0 }))
+        dataFrame.append(column: Column(name: "respiratory_rate", contents: metrics.map { $0.respiratoryRate ?? 15.0 }))
         
         // Strain features
         dataFrame.append(column: Column(name: "today_strain", contents: metrics.map { $0.todayStrain }))
@@ -176,6 +204,7 @@ class OnDeviceMLTrainer: ObservableObject {
         // Stress features
         dataFrame.append(column: Column(name: "avg_stress", contents: metrics.map { $0.averageStress ?? 0.0 }))
         dataFrame.append(column: Column(name: "max_stress", contents: metrics.map { $0.maxStress ?? 0.0 }))
+        dataFrame.append(column: Column(name: "time_in_high_stress", contents: metrics.map { $0.timeInHighStress ?? 0.0 }))
         dataFrame.append(column: Column(name: "avg_stress_7d", contents: metrics.map { $0.avgStressLast7Days ?? $0.averageStress ?? 0.0 }))
         
         // Rolling averages
@@ -257,19 +286,23 @@ class OnDeviceMLTrainer: ObservableObject {
         // 1. Build single-row DataFrame
         var inputFrame = DataFrame()
 
+        inputFrame.append(column: Column(name: "today_recovery", contents: [input.todayRecovery ?? 70.0]))
+
         inputFrame.append(column: Column(name: "sleep_duration", contents: [input.sleepDuration ?? 8.0]))
         inputFrame.append(column: Column(name: "sleep_efficiency", contents: [input.sleepEfficiency ?? 80.0]))
         inputFrame.append(column: Column(name: "restorative_sleep_pct", contents: [input.restorativeSleepPercentage ?? 30.0]))
         inputFrame.append(column: Column(name: "sleep_debt", contents: [input.sleepDebt ?? 0.0]))
+        inputFrame.append(column: Column(name: "sleep_debt_7d", contents: [input.sleepDebtLast7Days ?? input.sleepDebt ?? 0.0]))
         inputFrame.append(column: Column(name: "sleep_consistency", contents: [input.sleepConsistency ?? 80.0]))
         inputFrame.append(column: Column(name: "avg_sleep_7d", contents: [input.avgSleepLast7Days ?? 8.0]))
+        inputFrame.append(column: Column(name: "bedtime_consistency", contents: [input.bedtimeConsistency ?? 0.0]))
+        inputFrame.append(column: Column(name: "wake_time_consistency", contents: [input.wakeTimeConsistency ?? 0.0]))
 
         inputFrame.append(column: Column(name: "hrv", contents: [input.hrvAverage ?? 50.0]))
-        inputFrame.append(column: Column(name: "hrv_deviation", contents: [input.hrvDeviation ?? 0.0]))
         inputFrame.append(column: Column(name: "rhr", contents: [input.restingHeartRate ?? 60.0]))
-        inputFrame.append(column: Column(name: "rhr_deviation", contents: [input.rhrDeviation ?? 0.0]))
         inputFrame.append(column: Column(name: "avg_hrv_7d", contents: [input.avgHRVLast7Days ?? 50.0]))
         inputFrame.append(column: Column(name: "avg_rhr_7d", contents: [input.avgRHRLast7Days ?? 60.0]))
+        inputFrame.append(column: Column(name: "respiratory_rate", contents: [input.respiratoryRate ?? 15.0]))
 
         inputFrame.append(column: Column(name: "today_strain", contents: [input.todayStrain]))
         inputFrame.append(column: Column(name: "avg_strain_7d", contents: [input.avgStrainLast7Days ?? input.todayStrain]))
@@ -278,6 +311,7 @@ class OnDeviceMLTrainer: ObservableObject {
 
         inputFrame.append(column: Column(name: "avg_stress", contents: [input.averageStress ?? 0.0]))
         inputFrame.append(column: Column(name: "max_stress", contents: [input.maxStress ?? 0.0]))
+        inputFrame.append(column: Column(name: "time_in_high_stress", contents: [input.timeInHighStress ?? 0.0]))
         inputFrame.append(column: Column(name: "avg_stress_7d", contents: [input.avgStressLast7Days ?? 0.0]))
 
         inputFrame.append(column: Column(name: "avg_recovery_7d", contents: [input.avgRecoveryLast7Days ?? 70.0]))
@@ -352,11 +386,22 @@ class OnDeviceMLTrainer: ObservableObject {
     
     // MARK: - Prediction with Trained Model
     
-    /// Load the latest trained model and make a prediction
+    /// Load the latest trained model and make a prediction.
+    /// If the model is missing (e.g. schema bump deleted it) or the schema no longer
+    /// matches (pipeline error), a retrain is triggered automatically before retrying.
     func predictTomorrowRecovery() async throws -> RecoveryPrediction {
+        try await predictTomorrowRecovery(isRetry: false)
+    }
+
+    private func predictTomorrowRecovery(isRetry: Bool) async throws -> RecoveryPrediction {
         print("🔮 Making recovery prediction...")
 
-        // 1. Load the model
+        // 1. Auto-retrain if no model exists (e.g. stale model was deleted on launch)
+        if !FileManager.default.fileExists(atPath: compiledModelURL.path) {
+            print("🔄 No model on disk — training before prediction...")
+            try await trainModel(force: true)
+        }
+
         guard FileManager.default.fileExists(atPath: compiledModelURL.path) else {
             throw MLTrainingError.modelNotFound
         }
@@ -368,19 +413,24 @@ class OnDeviceMLTrainer: ObservableObject {
 
         // 3. Prepare input
         let inputDict: [String: Double] = [
+            "today_recovery": todayFeatures.todayRecovery ?? 70.0,
+
             "sleep_duration": todayFeatures.sleepDuration ?? 8.0,
             "sleep_efficiency": todayFeatures.sleepEfficiency ?? 80.0,
             "restorative_sleep_pct": todayFeatures.restorativeSleepPercentage ?? 30.0,
             "sleep_debt": todayFeatures.sleepDebt ?? 0.0,
+            "sleep_debt_7d": todayFeatures.sleepDebtLast7Days ?? todayFeatures.sleepDebt ?? 0.0,
             "sleep_consistency": todayFeatures.sleepConsistency ?? 80.0,
             "avg_sleep_7d": todayFeatures.avgSleepLast7Days ?? 8.0,
+            "bedtime_consistency": todayFeatures.bedtimeConsistency ?? 0.0,
+            "wake_time_consistency": todayFeatures.wakeTimeConsistency ?? 0.0,
 
+            // hrv_deviation & rhr_deviation removed — z-scores cover the same signal more cleanly
             "hrv": todayFeatures.hrvAverage ?? 50.0,
-            "hrv_deviation": todayFeatures.hrvDeviation ?? 0.0,
             "rhr": todayFeatures.restingHeartRate ?? 60.0,
-            "rhr_deviation": todayFeatures.rhrDeviation ?? 0.0,
             "avg_hrv_7d": todayFeatures.avgHRVLast7Days ?? 50.0,
             "avg_rhr_7d": todayFeatures.avgRHRLast7Days ?? 60.0,
+            "respiratory_rate": todayFeatures.respiratoryRate ?? 15.0,
 
             "today_strain": todayFeatures.todayStrain,
             "avg_strain_7d": todayFeatures.avgStrainLast7Days ?? todayFeatures.todayStrain,
@@ -389,6 +439,7 @@ class OnDeviceMLTrainer: ObservableObject {
 
             "avg_stress": todayFeatures.averageStress ?? 0.0,
             "max_stress": todayFeatures.maxStress ?? 0.0,
+            "time_in_high_stress": todayFeatures.timeInHighStress ?? 0.0,
             "avg_stress_7d": todayFeatures.avgStressLast7Days ?? 0.0,
 
             "avg_recovery_7d": todayFeatures.avgRecoveryLast7Days ?? 70.0,
@@ -413,9 +464,19 @@ class OnDeviceMLTrainer: ObservableObject {
             "hrv_to_strain_ratio": todayFeatures.hrvToStrainRatio ?? 0.0
         ]
 
-        // 4. Make prediction
+        // 4. Make prediction — catch CoreML schema-mismatch errors and retrain once
         let provider = try MLDictionaryFeatureProvider(dictionary: inputDict)
-        let prediction = try await mlModel.prediction(from: provider)
+        let prediction: MLFeatureProvider
+        do {
+            prediction = try await mlModel.prediction(from: provider)
+        } catch {
+            let desc = error.localizedDescription
+            let isSchemaMismatch = desc.contains("pipeline") || desc.contains("feature") || desc.contains("column")
+            guard isSchemaMismatch, !isRetry else { throw error }
+            print("⚠️ CoreML schema mismatch (\(desc)) — deleting stale model and retraining...")
+            try? FileManager.default.removeItem(at: compiledModelURL)
+            return try await predictTomorrowRecovery(isRetry: true)
+        }
 
         guard let predictedValue = prediction.featureValue(for: "tomorrow_recovery")?.doubleValue else {
             throw MLTrainingError.predictionFailed
@@ -778,3 +839,4 @@ enum MLTrainingError: LocalizedError {
         }
     }
 }
+#endif // canImport(CreateML)

@@ -1,9 +1,13 @@
 import SwiftUI
+import Combine
 
 struct WatchDashboardView: View {
     @State private var metrics: MetricsSnapshot?
     @State private var isLoading = true
     @State private var debugInfo: String = ""
+
+    // 5-minute fallback timer
+    private let refreshTimer = Timer.publish(every: 300, on: .main, in: .common).autoconnect()
     
     var body: some View {
         ScrollView {
@@ -147,6 +151,16 @@ struct WatchDashboardView: View {
             print("⌚️ [Watch] View appeared")
             loadMetrics()
         }
+        // Refresh instantly when iPhone pushes new data
+        .onReceive(NotificationCenter.default.publisher(for: .watchMetricsDidUpdate)) { _ in
+            print("⌚️ [Watch] Got live metric push — reloading")
+            loadMetrics()
+        }
+        // Fallback: re-read App Group every 5 minutes
+        .onReceive(refreshTimer) { _ in
+            print("⌚️ [Watch] Periodic refresh tick")
+            loadMetrics()
+        }
     }
     
     private func loadMetrics() {
@@ -167,10 +181,10 @@ struct WatchDashboardView: View {
         print("✅ [Watch] App Group accessible")
         debugInfo = "✅ App Group OK\n"
         
-        // Test read
-        let recovery = sharedDefaults.double(forKey: "latestRecovery")
-        let strain = sharedDefaults.double(forKey: "latestStrain")
-        let lastUpdate = sharedDefaults.object(forKey: "lastMetricsUpdate") as? Date
+        // Test read (keys must match DataSharingManager.Keys)
+        let recovery = sharedDefaults.double(forKey: "shared_recovery")
+        let strain = sharedDefaults.double(forKey: "shared_strain")
+        let lastUpdate = sharedDefaults.object(forKey: "shared_last_update") as? Date
         
         print("📊 [Watch] Read values: R=\(recovery) S=\(strain)")
         debugInfo += "R=\(Int(recovery)) S=\(Int(strain))\n"

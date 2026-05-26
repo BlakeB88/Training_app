@@ -14,6 +14,7 @@ struct StrainRecoveryComplication: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: StrainComplicationProvider()) { entry in
             StrainComplicationEntryView(entry: entry)
+                .containerBackground(.black, for: .widget)
         }
         .configurationDisplayName("Strain & Recovery")
         .description("View your current strain and recovery metrics")

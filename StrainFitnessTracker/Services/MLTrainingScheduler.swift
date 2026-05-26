@@ -5,6 +5,7 @@
 //  Automatically trains model daily in the background
 //
 
+#if canImport(CreateML)
 import Foundation
 import BackgroundTasks
 import UIKit
@@ -193,15 +194,16 @@ class MLTrainingScheduler {
 // MARK: - App Lifecycle Integration
 
 extension MLTrainingScheduler {
-    
+
     /// Call this from SceneDelegate or App when entering background
     func handleAppBackground() {
         scheduleNextTraining()
     }
-    
+
     /// Call this from SceneDelegate or App when becoming active
     @MainActor
     func handleAppForeground() async {
         await trainOnLaunchIfNeeded()
     }
 }
+#endif // canImport(CreateML)

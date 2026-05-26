@@ -58,6 +58,30 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
+      <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "DAE732242E8E1ADF00BA3CA2"
+               BuildableName = "StrainFitnessTrackerTests.xctest"
+               BlueprintName = "StrainFitnessTrackerTests"
+               ReferencedContainer = "container:StrainFitnessTracker.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "DAE7322E2E8E1ADF00BA3CA2"
+               BuildableName = "StrainFitnessTrackerUITests.xctest"
+               BlueprintName = "StrainFitnessTrackerUITests"
+               ReferencedContainer = "container:StrainFitnessTracker.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"

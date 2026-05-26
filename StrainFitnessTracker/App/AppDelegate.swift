@@ -4,7 +4,7 @@
 //
 //  Registers background tasks so the recovery model can train daily.
 //
-
+#if canImport(CreateML)
 import UIKit
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -26,3 +26,4 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
+#endif

@@ -379,27 +379,55 @@ class MLFeatureService {
         return slope
     }
     
+    /// Averages bedtimes that may straddle midnight (e.g. 11:30 PM and 12:30 AM → midnight).
+    /// Times with hour < 12 are treated as post-midnight by adding 24 h before averaging,
+    /// then the result is wrapped back into the 0–24 h range.
     private func calculateAverageBedtime(_ times: [Date]) -> Date {
         let calendar = Calendar.current
+        let secondsPerDay = 86400.0
+
         let seconds = times.map { time -> Double in
             let hour = Double(calendar.component(.hour, from: time))
             let minute = Double(calendar.component(.minute, from: time))
-            return (hour * 3600) + (minute * 60)
+            var s = hour * 3600 + minute * 60
+            // Treat early-AM hours as post-midnight (e.g. 0:30 → 24:30)
+            if hour < 12 { s += secondsPerDay }
+            return s
         }
-        
+
         let avgSeconds = seconds.reduce(0, +) / Double(seconds.count)
-        let hours = Int(avgSeconds / 3600)
-        let minutes = Int((avgSeconds.truncatingRemainder(dividingBy: 3600)) / 60)
-        
+        // Wrap back into a normal 24-hour clock value
+        let wrappedSeconds = avgSeconds.truncatingRemainder(dividingBy: secondsPerDay)
+
+        let hours = Int(wrappedSeconds / 3600)
+        let minutes = Int((wrappedSeconds.truncatingRemainder(dividingBy: 3600)) / 60)
+
         var components = DateComponents()
         components.hour = hours
         components.minute = minutes
-        
+
         return calendar.date(from: components) ?? Date()
     }
-    
+
+    /// Averages wake times (always in the AM, never crosses midnight — no special wrapping needed).
     private func calculateAverageWakeTime(_ times: [Date]) -> Date {
-        return calculateAverageBedtime(times) // Same logic
+        let calendar = Calendar.current
+
+        let seconds = times.map { time -> Double in
+            let hour = Double(calendar.component(.hour, from: time))
+            let minute = Double(calendar.component(.minute, from: time))
+            return hour * 3600 + minute * 60
+        }
+
+        let avgSeconds = seconds.reduce(0, +) / Double(seconds.count)
+        let hours = Int(avgSeconds / 3600)
+        let minutes = Int((avgSeconds.truncatingRemainder(dividingBy: 3600)) / 60)
+
+        var components = DateComponents()
+        components.hour = hours
+        components.minute = minutes
+
+        return calendar.date(from: components) ?? Date()
     }
 
     private func calculateZScore(current: Double, history: [Double]) -> Double? {

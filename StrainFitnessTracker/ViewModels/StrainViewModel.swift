@@ -84,7 +84,9 @@ class StrainViewModel: ObservableObject {
             dailyMetrics = try repository.fetchDailyMetrics(for: selectedDate)
             
             if let metrics = dailyMetrics {
-                DataSharingManager.shared.saveStrain(metrics.strain)
+                // Normalize strain (0–21 scale) to 0–100 percentage for Watch display.
+                let strainPct = min((metrics.strain / 21.0) * 100.0, 100.0)
+                DataSharingManager.shared.saveStrain(strainPct)
             }
             
             // Load weekly metrics (7 days)

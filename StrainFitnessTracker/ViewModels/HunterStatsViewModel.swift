@@ -43,6 +43,9 @@ final class HunterStatsViewModel: ObservableObject {
             let snapshot = statsEngine.makeSnapshot(from: inputs)
             persistence.save(snapshot.xpState)
             self.snapshot = snapshot
+
+            // Share rank with widget + Watch
+            DataSharingManager.shared.saveRank(snapshot.hunterRank.displayName)
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -24,11 +24,15 @@ struct MainTabView: View {
             Group {
                 switch selectedTab {
                 case .home:
-                    DashboardView()
+                    DashboardView(switchToStress: { selectedTab = .stress })
                 case .hunter:
                     HunterStatsView()
                 case .health:
+                    #if canImport(CreateML)
                     MLPredictionView()
+                    #else
+                    Color.appBackground.ignoresSafeArea()
+                    #endif
                     
                 case .stress:
                     StressView()

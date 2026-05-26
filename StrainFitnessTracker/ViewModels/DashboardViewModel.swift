@@ -15,7 +15,10 @@ class DashboardViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var metrics: DailyMetrics
     @Published var weekData: StrainRecoveryWeekData
+    @Published var weekSleepData: [SleepWeekEntry] = []
     @Published var detailedMetrics: [HealthMetric] = []
+    /// Exactly the 5 metrics that feed the "x/5 in range" Health Monitor score.
+    @Published var healthMonitorMetrics: [HealthMetric] = []
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var needsAuthorization: Bool = false
@@ -145,24 +148,29 @@ class DashboardViewModel: ObservableObject {
         
         // Try to load data from repository first (might have cached data)
         await loadFromRepository()
-        
-        // If no data exists or data is old, do initial sync with force refresh
-        let shouldForceRefresh = shouldRefreshData()
-        if metrics.date != Date().startOfDay || shouldForceRefresh {
-            await refreshData(forceRefresh: shouldForceRefresh)
-        }
-        
-        isLoading = false
-        
-        DataSharingManager.shared.saveMetrics(recovery: 75, strain: 45, exertion: 60)
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            if let test = DataSharingManager.shared.getLatestMetrics() {
-                print("✅ App Groups WORKING: R=\(test.recoveryPercentage)% S=\(test.strainPercentage)%")
-            } else {
-                print("❌ App Groups NOT WORKING!")
+        if dataSyncService.lastSyncDate == nil {
+            // First ever launch — pull 28 days so the baseline calculator has
+            // enough HRV + RHR history to work with immediately.
+            print("📅 First launch — performing 28-day historical backfill for baseline...")
+            await dataSyncService.fullSync(days: 28, forceRefresh: true)
+            await loadFromRepository()
+        } else if needsBaselineBackfill() {
+            // App has been used before but HRV/RHR baselines still aren't established
+            // (e.g. sync window was too short, or some days lacked Apple Watch data).
+            // Backfill silently — no loading spinner, data already showing.
+            print("📅 Baseline not yet established — backfilling 28 days of history...")
+            await dataSyncService.fullSync(days: 28, forceRefresh: false)
+            await loadFromRepository()
+        } else {
+            // Normal refresh path.
+            let shouldForceRefresh = shouldRefreshData()
+            if metrics.date != Date().startOfDay || shouldForceRefresh {
+                await refreshData(forceRefresh: shouldForceRefresh)
             }
         }
+
+        isLoading = false
     }
     
     /// Refresh all dashboard data (triggers HealthKit sync)
@@ -261,8 +269,8 @@ class DashboardViewModel: ObservableObject {
             }
         }
         
-        // Do full sync (last 7 days) with force refresh
-        await dataSyncService.fullSync(days: 7, forceRefresh: true)
+        // Sync last 28 days so the baseline calculator always has enough HRV/RHR history.
+        await dataSyncService.fullSync(days: 28, forceRefresh: true)
         
         // Load fresh data
         await loadFromRepository(for: displayedDate)
@@ -272,6 +280,24 @@ class DashboardViewModel: ObservableObject {
     
     // MARK: - Private Methods
     
+    /// Returns true when the CoreData history doesn't have enough days with both
+    /// HRV and RHR to establish a personal baseline (requires 7 valid days).
+    private func needsBaselineBackfill() -> Bool {
+        guard let recentMetrics = try? repository.fetchRecentDailyMetrics(days: 28) else {
+            return true
+        }
+        let validDays = recentMetrics.filter {
+            $0.hrvAverage != nil && $0.restingHeartRate != nil
+        }.count
+        let needed = AppConstants.Baseline.minimumDaysForBaseline
+        if validDays < needed {
+            print("📊 Baseline check: \(validDays)/\(needed) valid HRV+RHR days — backfill needed")
+            return true
+        }
+        print("📊 Baseline check: \(validDays)/\(needed) valid days — baseline OK")
+        return false
+    }
+
     /// Check if we should force refresh data
     private func shouldRefreshData() -> Bool {
         // Force refresh if no sync yet
@@ -311,13 +337,28 @@ class DashboardViewModel: ObservableObject {
         print("📂 Loading from repository for \(normalizedDate.formatted())...")
         
         // Load today's metrics
-        guard let simpleDailyMetrics = try? repository.fetchDailyMetrics(for: normalizedDate) else {
+        guard var simpleDailyMetrics = try? repository.fetchDailyMetrics(for: normalizedDate) else {
             // No data yet - this is normal for first launch
             print("⚠️ No data in repository for \(normalizedDate.formatted())")
             // Keep showing sample data
             return
         }
-        
+
+        // BaselineMetrics is intentionally never persisted to CoreData (no schema field for it).
+        // Recompute it fresh from the stored per-day HRV + RHR rows on every load.
+        // This is cheap — it's just an average over in-memory CoreData records.
+        let baselineStart = Calendar.current.date(byAdding: .day, value: -27, to: normalizedDate)!
+        let historicalForBaseline = (try? repository.fetchDailyMetrics(from: baselineStart, to: normalizedDate)) ?? []
+        simpleDailyMetrics.baselineMetrics = HRVOutlierFilter.calculateBaselinesWithFiltering(
+            from: historicalForBaseline,
+            forDate: normalizedDate
+        )
+        if let b = simpleDailyMetrics.baselineMetrics {
+            print("  ✅ Baseline recomputed: HRV=\(String(format: "%.1f", b.hrvBaseline ?? 0)) ms, RHR=\(String(format: "%.1f", b.rhrBaseline ?? 0)) bpm (\(b.daysOfData) days)")
+        } else {
+            print("  ⚠️ Baseline unavailable — need \(AppConstants.Baseline.minimumDaysForBaseline) days with HRV+RHR data (have \(historicalForBaseline.filter { $0.hrvAverage != nil && $0.restingHeartRate != nil }.count))")
+        }
+
         print("✅ Found metrics in repository:")
         print("  Date: \(simpleDailyMetrics.date.formatted())")
         print("  Sleep Duration: \(simpleDailyMetrics.sleepDuration ?? 0) hours")
@@ -345,13 +386,16 @@ class DashboardViewModel: ObservableObject {
         print("  📊 Loaded \(weekMetrics.count) days of week data")
         
         // Convert to UI models
-        let uiMetrics = convertToUIMetrics(simpleDailyMetrics)
-        let uiWeekData = convertToWeekData(weekMetrics)
-        
+        let uiMetrics    = convertToUIMetrics(simpleDailyMetrics)
+        let uiWeekData   = convertToWeekData(weekMetrics)
+        let uiSleepData  = buildSleepWeekData(weekMetrics)
+
         // Update UI
-        self.metrics = uiMetrics
-        self.weekData = uiWeekData
+        self.metrics       = uiMetrics
+        self.weekData      = uiWeekData
+        self.weekSleepData = uiSleepData
         self.detailedMetrics = Self.generateDetailedMetrics(from: metrics)
+        self.healthMonitorMetrics = Self.generateHealthMonitorMetrics(from: simpleDailyMetrics)
         
         print("✅ Dashboard UI updated with real data")
         // Trigger widget/complication refresh
@@ -442,12 +486,14 @@ class DashboardViewModel: ObservableObject {
         print("    Stress history points: \(stressHistory.count)")
         print("    Current stress: \(currentStress)")
         
+        let healthCounts = calculateMetricsInRange(simple)
+
         let metrics = DailyMetrics(
             date: simple.date,
             sleepScore: sleepScore,
             recoveryScore: simple.recovery ?? 0,
             strainScore: simple.strain,
-            
+
             // Sleep Metrics
             sleepDuration: (simple.sleepDuration ?? 0) * 3600,
             restorativeSleepPercentage: simple.restorativeSleepPercentage ?? 0,
@@ -456,32 +502,52 @@ class DashboardViewModel: ObservableObject {
             timeInBed: (simple.timeInBed ?? 0) * 3600,
             sleepDebt: (simple.sleepDebt ?? 0) * 3600,
             respiratoryRate: simple.respiratoryRate ?? simple.baselineMetrics?.respiratoryRateBaseline ?? 14.0,
-            
+
             // Activity Metrics
             calories: Int(simple.activeCalories ?? 0),
             steps: simple.steps ?? 0,
             averageHeartRate: Int(simple.averageHeartRate ?? simple.restingHeartRate ?? 60),
             restingHeartRate: Int(simple.restingHeartRate ?? 60),
             vo2Max: simple.vo2Max ?? 0,
-            
+
             // ✨ Stress Metrics (from persisted data!)
             currentStress: currentStress,
             stressHistory: stressHistory,
-            
+
             // Activities
             activities: allActivities,
-            
-            // Health Monitor
-            healthMetricsInRange: calculateMetricsInRange(simple),
-            totalHealthMetrics: 5
+
+            // Health Monitor — total is dynamic; HRV/RHR only counted once baselines exist
+            healthMetricsInRange: healthCounts.inRange,
+            totalHealthMetrics: healthCounts.total
         )
         
+        // Normalize strain (0–21 scale) to a 0–100 percentage for Watch/widget display.
+        let strainPercentage = min((simple.strain / 21.0) * 100.0, 100.0)
         DataSharingManager.shared.saveMetrics(
             recovery: simple.recovery ?? 0,
-            strain: simple.strain,
-            exertion: nil // Add exertion if you track it
+            strain: strainPercentage,
+            exertion: nil
         )
-        
+
+        // Save sleep hours + score for widget
+        if let sleepHours = simple.sleepDuration, sleepHours > 0 {
+            DataSharingManager.shared.saveSleep(sleepHours)
+        }
+        DataSharingManager.shared.saveSleepScore(sleepScore)
+
+        // Save raw strain (0–21) for widget to display like the dashboard
+        DataSharingManager.shared.saveStrainRaw(simple.strain)
+
+        // Push live metrics to Watch via WatchConnectivity
+        let currentRank = DataSharingManager.shared.getRank() ?? "E"
+        PhoneConnectivityManager.shared.sendMetricsToWatch(
+            recovery:   simple.recovery ?? 0,
+            strainRaw:  simple.strain,
+            sleepScore: sleepScore,
+            rank:       currentRank
+        )
+
         return metrics
     }
 
@@ -540,43 +606,39 @@ class DashboardViewModel: ObservableObject {
         return min(100, max(0, score))
     }
 
-    /// Improved metrics in range calculation
-    private func calculateMetricsInRange(_ metrics: SimpleDailyMetrics) -> Int {
+    /// Returns (inRange, total) where `total` only includes metrics that can actually be
+    /// evaluated right now.  HRV and RHR require a personal baseline; they are excluded
+    /// from the denominator until enough historical data exists (typically 7+ days).
+    private func calculateMetricsInRange(_ metrics: SimpleDailyMetrics) -> (inRange: Int, total: Int) {
         var inRange = 0
-        
-        // 1. Check HRV (within 15% of baseline)
+        var total = 3  // Sleep, Recovery, Strain always have fixed targets — always evaluable
+
+        // 1. HRV — higher is always better; only out of range if > 15% BELOW baseline.
+        //    Requires a personal baseline; skip entirely when none exists yet.
         if let hrv = metrics.hrvAverage,
            let baseline = metrics.baselineMetrics?.hrvBaseline {
-            let percentDiff = abs(hrv - baseline) / baseline
-            if percentDiff < 0.15 {
-                inRange += 1
-            }
+            total += 1
+            if hrv >= baseline * 0.85 { inRange += 1 }
         }
-        
-        // 2. Check RHR (within 5 bpm of baseline)
+
+        // 2. RHR — within 5 bpm of personal baseline.
+        //    Requires a personal baseline; skip entirely when none exists yet.
         if let rhr = metrics.restingHeartRate,
            let baseline = metrics.baselineMetrics?.rhrBaseline {
-            if abs(rhr - baseline) < 5 {
-                inRange += 1
-            }
+            total += 1
+            if abs(rhr - baseline) < 5 { inRange += 1 }
         }
-        
-        // 3. Check Sleep Duration (7+ hours)
-        if let sleep = metrics.sleepDuration, sleep >= 7 {
-            inRange += 1
-        }
-        
-        // 4. Check Recovery (70%+ is good)
-        if let recovery = metrics.recovery, recovery >= 70 {
-            inRange += 1
-        }
-        
-        // 5. Check Strain (not overtraining - below 18)
-        if metrics.strain < 18 {
-            inRange += 1
-        }
-        
-        return inRange
+
+        // 3. Sleep Duration (7+ hours)
+        if let sleep = metrics.sleepDuration, sleep >= 7 { inRange += 1 }
+
+        // 4. Recovery (70%+)
+        if let recovery = metrics.recovery, recovery >= 70 { inRange += 1 }
+
+        // 5. Strain (below 18 = not overtraining)
+        if metrics.strain < 18 { inRange += 1 }
+
+        return (inRange, total)
     }
     
     private func convertWorkoutsToActivities(_ workouts: [WorkoutSummary]) -> [Activity] {
@@ -620,8 +682,19 @@ class DashboardViewModel: ObservableObject {
                 recovery: metrics.recovery ?? 0
             )
         }
-        
+
         return StrainRecoveryWeekData(weekDays: dayData)
+    }
+
+    private func buildSleepWeekData(_ weekMetrics: [SimpleDailyMetrics]) -> [SleepWeekEntry] {
+        weekMetrics.compactMap { m in
+            guard let slept = m.sleepDuration, slept > 0 else { return nil }
+            return SleepWeekEntry(
+                date: m.date,
+                hoursSlept: slept,
+                hoursNeeded: SleepWeekEntry.sleepNeeded(debt: m.sleepDebt ?? 0, strain: m.strain)
+            )
+        }
     }
     
     private static func generateDetailedMetrics(from metrics: DailyMetrics) -> [HealthMetric] {
@@ -641,6 +714,120 @@ class DashboardViewModel: ObservableObject {
         ]
     }
     
+    /// Builds exactly the 5 `HealthMetric` rows that mirror `calculateMetricsInRange`.
+    ///
+    /// Rules that MUST match `calculateMetricsInRange` exactly:
+    ///  - HRV/RHR: only evaluated when a real baseline exists (no fallback constants).
+    ///    If baseline is absent, the row shows neutral (.stable) — identical to how
+    ///    calculateMetricsInRange skips the metric via `if let baseline`.
+    ///  - HRV is one-sided: above baseline is always good; only flag if > 15% BELOW.
+    ///  - Sleep ≥ 7 h, Recovery ≥ 70 %, Strain < 18 need no baseline.
+    private static func generateHealthMonitorMetrics(from simple: SimpleDailyMetrics) -> [HealthMetric] {
+        var result: [HealthMetric] = []
+
+        // 1. HRV Average
+        //    Higher is always better — only out of range if significantly below baseline.
+        //    Requires a real baseline; shows neutral when none is available yet.
+        if let hrv = simple.hrvAverage, hrv > 0 {
+            if let baseline = simple.baselineMetrics?.hrvBaseline {
+                let inRange = hrv >= baseline * 0.85  // mirrors calculateMetricsInRange fix
+                result.append(HealthMetric(
+                    name: "HRV Average",
+                    value: "\(Int(hrv)) ms",
+                    comparisonValue: "/ \(Int(baseline)) ms",
+                    trend: inRange ? .up(isPositive: true) : .down(isPositive: false),
+                    icon: "waveform.path.ecg"
+                ))
+            } else {
+                result.append(HealthMetric(
+                    name: "HRV Average",
+                    value: "\(Int(hrv)) ms",
+                    comparisonValue: "no baseline yet",
+                    trend: .stable,
+                    icon: "waveform.path.ecg"
+                ))
+            }
+        } else {
+            result.append(HealthMetric(
+                name: "HRV Average",
+                value: "--",
+                comparisonValue: "No data",
+                trend: .stable,
+                icon: "waveform.path.ecg"
+            ))
+        }
+
+        // 2. Resting Heart Rate — within 5 bpm of personal baseline.
+        //    Requires a real baseline; shows neutral when none is available yet.
+        if let rhr = simple.restingHeartRate, rhr > 0 {
+            if let baseline = simple.baselineMetrics?.rhrBaseline {
+                let inRange = abs(rhr - baseline) < 5
+                result.append(HealthMetric(
+                    name: "Resting Heart Rate",
+                    value: "\(Int(rhr)) bpm",
+                    comparisonValue: "/ \(Int(baseline)) bpm",
+                    trend: inRange
+                        ? .up(isPositive: true)
+                        : (rhr > baseline ? .up(isPositive: false) : .down(isPositive: false)),
+                    icon: "heart.circle.fill"
+                ))
+            } else {
+                result.append(HealthMetric(
+                    name: "Resting Heart Rate",
+                    value: "\(Int(rhr)) bpm",
+                    comparisonValue: "no baseline yet",
+                    trend: .stable,
+                    icon: "heart.circle.fill"
+                ))
+            }
+        } else {
+            result.append(HealthMetric(
+                name: "Resting Heart Rate",
+                value: "--",
+                comparisonValue: "No data",
+                trend: .stable,
+                icon: "heart.circle.fill"
+            ))
+        }
+
+        // 3. Sleep Duration — 7+ hours (no baseline needed)
+        let sleepHours = simple.sleepDuration ?? 0
+        let sleepInRange = sleepHours >= 7
+        let sleepH = Int(sleepHours)
+        let sleepM = Int((sleepHours - Double(sleepH)) * 60)
+        result.append(HealthMetric(
+            name: "Sleep Duration",
+            value: sleepHours > 0 ? "\(sleepH):\(String(format: "%02d", sleepM))" : "--",
+            comparisonValue: "/ 7:00 h",
+            trend: sleepInRange ? .up(isPositive: true) : .down(isPositive: false),
+            icon: "moon.stars.fill"
+        ))
+
+        // 4. Recovery Score — 70%+ (no baseline needed)
+        let recovery = simple.recovery ?? 0
+        let recoveryInRange = recovery >= 70
+        result.append(HealthMetric(
+            name: "Recovery Score",
+            value: "\(Int(recovery))%",
+            comparisonValue: "/ 70%",
+            trend: recoveryInRange ? .up(isPositive: true) : .down(isPositive: false),
+            icon: "bolt.heart.fill"
+        ))
+
+        // 5. Daily Strain — below 18 means not overtraining (no baseline needed)
+        let strain = simple.strain
+        let strainInRange = strain < 18
+        result.append(HealthMetric(
+            name: "Daily Strain",
+            value: String(format: "%.1f", strain),
+            comparisonValue: "< 18",
+            trend: strainInRange ? .up(isPositive: true) : .up(isPositive: false),
+            icon: "flame.fill"
+        ))
+
+        return result
+    }
+
     // MARK: - Debug Methods
     
     /// Debug info about stress data freshness

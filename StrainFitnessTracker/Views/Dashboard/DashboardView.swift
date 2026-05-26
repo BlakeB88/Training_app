@@ -8,12 +8,18 @@
 import SwiftUI
 
 struct DashboardView: View {
+    /// Called when the user taps the Stress Monitor card — switches the tab bar to Stress.
+    var switchToStress: (() -> Void)? = nil
+
     @StateObject private var viewModel = DashboardViewModel(
         dataSyncService: .shared,
         repository: MetricsRepository(),
         stressMonitorVM: StressMonitorViewModel(healthKitManager: HealthKitManager.shared)
     )
     @StateObject private var hunterViewModel = HunterStatsViewModel()
+    @ObservedObject private var cutoffManager = WorkoutCutoffManager.shared
+    @ObservedObject private var watchConnectivity = PhoneConnectivityManager.shared
+    @State private var activeCutoffPrompt: PendingWorkoutCutoff? = nil
     @State private var selectedDate = Date()
 
     private var todaysSleepActivity: Activity? {
@@ -62,7 +68,10 @@ struct DashboardView: View {
                             
                             // Stress Monitor Graph - UPDATED
                             stressMonitorSection
-                            
+
+                            // Hours vs. Need sleep chart
+                            SleepHoursVsNeedView(entries: viewModel.weekSleepData)
+
                             // Strain & Recovery Chart
                             strainRecoverySection
                         }
@@ -120,6 +129,34 @@ struct DashboardView: View {
             print("📱 Dashboard appeared, initializing...")
             await viewModel.initialize()
             await hunterViewModel.load()
+            // Show any pending cutoff prompts that arrived before view loaded
+            if activeCutoffPrompt == nil {
+                activeCutoffPrompt = cutoffManager.pendingCutoffs.first
+            }
+        }
+        .onChange(of: cutoffManager.pendingCutoffs) { _, cutoffs in
+            // Show the next pending cutoff as soon as the queue has one
+            // (and we're not already showing a prompt).
+            if activeCutoffPrompt == nil {
+                activeCutoffPrompt = cutoffs.first
+            }
+        }
+        .sheet(item: $activeCutoffPrompt) { cutoff in
+            WorkoutCutoffPromptView(
+                cutoff: cutoff,
+                onAccept: {
+                    // Re-sync the workout's day so the trimmed strain is applied.
+                    Task { await viewModel.loadData(for: cutoff.workoutDate, forceRefresh: true) }
+                    activeCutoffPrompt = cutoffManager.pendingCutoffs.first
+                },
+                onReject: {
+                    activeCutoffPrompt = cutoffManager.pendingCutoffs.first
+                },
+                onDismiss: {
+                    // "Decide Later" — don't advance the queue, just close.
+                    activeCutoffPrompt = nil
+                }
+            )
         }
     }
 
@@ -183,15 +220,15 @@ struct DashboardView: View {
             
             Spacer()
             
-            // Device battery
+            // Watch battery
             HStack(spacing: 4) {
-                Image(systemName: "applewatch")
+                Image(systemName: watchConnectivity.watchIsCharging ? "applewatch.radiowaves.left.and.right" : "applewatch")
                     .font(.system(size: 14))
-                    .foregroundColor(.secondaryText)
-                
-                Text("--")
+                    .foregroundColor(watchConnectivity.watchBatteryColor)
+
+                Text(watchConnectivity.watchBatteryText)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.secondaryText)
+                    .foregroundColor(watchConnectivity.watchBatteryColor)
             }
         }
     }
@@ -258,16 +295,28 @@ struct DashboardView: View {
     
     // MARK: - Monitor Cards Section
     private var monitorCardsSection: some View {
-        HStack(spacing: 12) {
-            HealthMonitorCard(
+        VStack(spacing: 12) {
+            NavigationLink(destination: HealthMonitorDetailView(
                 metricsInRange: viewModel.metrics.healthMetricsInRange,
-                totalMetrics: viewModel.metrics.totalHealthMetrics
-            )
-            
-            StressMonitorCard(
-                currentStress: viewModel.metrics.currentStress,
-                lastUpdateTime: viewModel.lastStressUpdate
-            )
+                totalMetrics: viewModel.metrics.totalHealthMetrics,
+                metrics: viewModel.healthMonitorMetrics
+            )) {
+                HealthMonitorCard(
+                    metricsInRange: viewModel.metrics.healthMetricsInRange,
+                    totalMetrics: viewModel.metrics.totalHealthMetrics
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                switchToStress?()
+            } label: {
+                StressMonitorCard(
+                    currentStress: viewModel.metrics.currentStress,
+                    lastUpdateTime: viewModel.lastStressUpdate
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
     

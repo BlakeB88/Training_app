@@ -4,7 +4,7 @@
 //
 //  Upgraded with full WHOOP-style UI
 //
-
+#if canImport(CreateML)
 import SwiftUI
 
 struct MLPredictionView: View {
@@ -89,8 +89,13 @@ private extension RecoveryPredictionCard {
     var loadingState: some View {
         VStack(spacing: 12) {
             ProgressView().scaleEffect(1.2)
-            Text("Generating Prediction…")
+            Text(trainer.isTraining ? "Retraining model…" : "Generating Prediction…")
                 .foregroundColor(.secondary)
+            if trainer.isTraining {
+                Text("This only happens once after an update")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
         }
         .padding(.vertical, 20)
     }
@@ -448,3 +453,4 @@ private extension RecoveryPredictionCard {
         }
     }
 }
+#endif

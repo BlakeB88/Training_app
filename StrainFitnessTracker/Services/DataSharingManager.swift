@@ -24,6 +24,10 @@ class DataSharingManager {
         static let strain = "shared_strain"
         static let exertion = "shared_exertion"
         static let lastUpdate = "shared_last_update"
+        static let sleep = "shared_sleep"           // Double — hours (e.g. 7.5)
+        static let sleepScore = "shared_sleep_score" // Int — 0-100 score (matches dashboard ring)
+        static let strainRaw = "shared_strain_raw"   // Double — raw 0-21 value (e.g. 15.1)
+        static let rank = "shared_rank"              // String — display name (e.g. "A", "S+")
     }
     
     private init() {
@@ -77,6 +81,30 @@ class DataSharingManager {
         defaults.set(Date(), forKey: Keys.lastUpdate)
         defaults.synchronize()
     }
+
+    func saveSleep(_ hours: Double) {
+        guard let defaults = userDefaults else { return }
+        defaults.set(hours, forKey: Keys.sleep)
+        defaults.synchronize()
+    }
+
+    func saveSleepScore(_ score: Double) {
+        guard let defaults = userDefaults else { return }
+        defaults.set(Int(score.rounded()), forKey: Keys.sleepScore)
+        defaults.synchronize()
+    }
+
+    func saveStrainRaw(_ strain: Double) {
+        guard let defaults = userDefaults else { return }
+        defaults.set(strain, forKey: Keys.strainRaw)
+        defaults.synchronize()
+    }
+
+    func saveRank(_ rankDisplayName: String) {
+        guard let defaults = userDefaults else { return }
+        defaults.set(rankDisplayName, forKey: Keys.rank)
+        defaults.synchronize()
+    }
     
     // MARK: - Retrieve Methods
     
@@ -125,6 +153,29 @@ class DataSharingManager {
         guard let defaults = userDefaults else { return nil }
         let value = defaults.integer(forKey: Keys.exertion)
         return value > 0 ? value : nil
+    }
+
+    func getSleep() -> Double? {
+        guard let defaults = userDefaults else { return nil }
+        let value = defaults.double(forKey: Keys.sleep)
+        return value > 0 ? value : nil
+    }
+
+    func getSleepScore() -> Int? {
+        guard let defaults = userDefaults else { return nil }
+        let value = defaults.integer(forKey: Keys.sleepScore)
+        return value > 0 ? value : nil
+    }
+
+    func getStrainRaw() -> Double? {
+        guard let defaults = userDefaults else { return nil }
+        let value = defaults.double(forKey: Keys.strainRaw)
+        return value > 0 ? value : nil
+    }
+
+    func getRank() -> String? {
+        guard let defaults = userDefaults else { return nil }
+        return defaults.string(forKey: Keys.rank)
     }
     
     func isDataStale() -> Bool {

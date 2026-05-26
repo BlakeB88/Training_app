@@ -696,10 +696,39 @@ class DataSyncService: ObservableObject {
     }
     
     // MARK: - Workout Summary Creation
-    
+
     private func createWorkoutSummary(_ workout: HKWorkout, hrProfile: HeartRateProfile) async throws -> WorkoutSummary {
         let heartRateSamples = try await workoutQuery.fetchHeartRateSamples(for: workout)
-        let effectiveEndDate = WorkoutAutoCutoff.effectiveEndDate(for: workout, heartRateSamples: heartRateSamples) ?? workout.endDate
+        let manager = WorkoutCutoffManager.shared   // both are @MainActor — no await needed
+
+        // Determine the effective end date based on cutoff detection + user decisions.
+        let effectiveEndDate: Date
+        if let detection = WorkoutAutoCutoff.detectCutoff(for: workout, heartRateSamples: heartRateSamples) {
+            if manager.isAccepted(workout.uuid) {
+                // User already confirmed the trim — apply it.
+                effectiveEndDate = detection.suggestedEndDate
+            } else if manager.isRejected(workout.uuid) {
+                // User explicitly said "keep the full workout" — honour that.
+                effectiveEndDate = workout.endDate
+            } else {
+                // First time we're seeing this cutoff — queue it for user review
+                // and use the original end date for now so nothing is lost.
+                let pending = PendingWorkoutCutoff(
+                    id: UUID(),
+                    workoutId: workout.uuid,
+                    workoutTypeRaw: workout.workoutActivityType.rawValue,
+                    startDate: workout.startDate,
+                    originalEndDate: workout.endDate,
+                    suggestedEndDate: detection.suggestedEndDate,
+                    lowHRStartDate: detection.lowHRStartDate
+                )
+                manager.add(pending)
+                effectiveEndDate = workout.endDate
+            }
+        } else {
+            effectiveEndDate = workout.endDate
+        }
+
         let trimmedHeartRateSamples = heartRateSamples.filter { $0.date <= effectiveEndDate }
         let heartRateData = trimmedHeartRateSamples.map(\.heartRate)
         let effectiveDuration = max(0, effectiveEndDate.timeIntervalSince(workout.startDate))

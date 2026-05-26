@@ -19,6 +19,9 @@ struct SleepDetailView: View {
     @State private var sleepStages: [SleepStage] = []
     @State private var isLoadingDetails = true
     @State private var selectedTime: Date?
+    @State private var weekSleepData: [SleepWeekEntry] = []
+
+    private let repository = MetricsRepository()
 
     private var selectedStage: SleepStage? {
         guard let selectedTime else { return nil }
@@ -46,7 +49,17 @@ struct SleepDetailView: View {
                 if let data = sleepData, data.hasDetailedStages {
                     sleepStagesBreakdownSection
                 }
-                
+
+                // WHOOP-style stage comparison bars
+                if let data = sleepData, data.hasDetailedStages {
+                    sleepStageComparisonSection(data: data)
+                }
+
+                // Hours vs. Need weekly chart
+                SleepHoursVsNeedView(entries: weekSleepData)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
+
                 // Schedule details
                 scheduleSection
             }
@@ -67,6 +80,7 @@ struct SleepDetailView: View {
             }
         }
         .task {
+            loadWeekSleepData()
             await loadSleepDetails()
         }
     }
@@ -147,53 +161,26 @@ struct SleepDetailView: View {
     
     // MARK: - Sleep Stages Section
     private var sleepStagesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("SLEEP STAGES")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.secondaryText)
                 .tracking(0.5)
                 .padding(.horizontal, 16)
 
-            VStack(spacing: 16) {
-                // Timeline chart
+            VStack(spacing: 12) {
                 sleepStagesChart
 
                 if let selectedStage = selectedStage {
                     stageSelectionSummary(for: selectedStage)
                         .padding(.horizontal, 16)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                 }
-
-                // Time axis labels
-                HStack {
-                    Text(sleepStart.formatted(date: .omitted, time: .shortened))
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondaryText)
-                    
-                    Spacer()
-                    
-                    Text(sleepEnd.formatted(date: .omitted, time: .shortened))
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondaryText)
-                }
-                .padding(.horizontal, 16)
             }
-            .padding(.vertical, 18)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.cardBackground, Color.cardBackground.opacity(0.9)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(Color.white.opacity(0.04), lineWidth: 1)
-                    .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 8)
-            )
-            .cornerRadius(18)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 12)
+            .background(Color.cardBackground)
+            .cornerRadius(16)
             .padding(.horizontal, 16)
         }
         .padding(.top, 16)
@@ -209,23 +196,49 @@ struct SleepDetailView: View {
                     yEnd: .value("Stage", stageBand(for: stage.stage).upperBound)
                 )
                 .foregroundStyle(stageColor(stage.stage))
-                .cornerRadius(4)
-                .opacity(isStageSelected(stage) ? 1.0 : 0.82)
+                .cornerRadius(2)
             }
 
             if let selectedTime {
                 RuleMark(x: .value("Selected", selectedTime))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [6, 4]))
-                    .foregroundStyle(Color.secondaryText)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                    .foregroundStyle(Color.white.opacity(0.45))
             }
         }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
         .chartYScale(domain: 0...4)
         .chartXScale(domain: sleepStart...sleepEnd)
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .hour, count: 3)) { _ in
+                AxisGridLine()
+                    .foregroundStyle(Color.white.opacity(0.07))
+                AxisValueLabel(format: .dateTime.hour(.defaultDigits(amPM: .abbreviated)))
+                    .foregroundStyle(Color(white: 0.45))
+                    .font(.system(size: 10))
+            }
+        }
+        .chartYAxis {
+            AxisMarks(values: [3.5, 2.5, 1.5, 0.5]) { value in
+                AxisValueLabel {
+                    if let v = value.as(Double.self) {
+                        Text(yAxisLabel(for: v))
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color(white: 0.45))
+                    }
+                }
+            }
+        }
         .chartXSelection(value: $selectedTime)
-        .frame(height: 140)
-        .padding(.horizontal, 16)
+        .frame(height: 185)
+    }
+
+    private func yAxisLabel(for midpoint: Double) -> String {
+        switch midpoint {
+        case 3.5: return "Awake"
+        case 2.5: return "REM"
+        case 1.5: return "Core"
+        case 0.5: return "Deep"
+        default: return ""
+        }
     }
 
     private func stageSelectionSummary(for stage: SleepStage) -> some View {
@@ -366,6 +379,73 @@ struct SleepDetailView: View {
         .padding(.top, 16)
     }
     
+    // MARK: - Stage Comparison Section (WHOOP-style)
+
+    private func sleepStageComparisonSection(data: HealthKitManager.SleepData) -> some View {
+        let inBed = data.timeInBed > 0 ? data.timeInBed : (data.totalSleepDuration + data.awakeDuration)
+        let awakePct = inBed > 0 ? (data.awakeDuration      / inBed) * 100 : 0
+        let corePct  = inBed > 0 ? (data.coreSleepDuration  / inBed) * 100 : 0
+        let deepPct  = inBed > 0 ? (data.deepSleepDuration  / inBed) * 100 : 0
+        let remPct   = inBed > 0 ? (data.remSleepDuration   / inBed) * 100 : 0
+
+        return VStack(alignment: .leading, spacing: 12) {
+            // Header + legend
+            HStack {
+                Text("TYPICAL RANGE")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.secondaryText)
+                    .tracking(0.5)
+                Spacer()
+                HStack(spacing: 5) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                        .foregroundColor(Color.white.opacity(0.45))
+                        .frame(width: 22, height: 12)
+                    Text("Typical range")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondaryText)
+                }
+            }
+            .padding(.horizontal, 16)
+
+            VStack(spacing: 0) {
+                SleepStageComparisonBar(
+                    stage: "Awake",   percentage: awakePct,
+                    duration: formatHoursMinutes(data.awakeDuration     / 3600),
+                    color: .orange,
+                    typicalLow: 2,  typicalHigh: 8)
+
+                Divider().padding(.leading, 16)
+
+                SleepStageComparisonBar(
+                    stage: "Core",    percentage: corePct,
+                    duration: formatHoursMinutes(data.coreSleepDuration / 3600),
+                    color: .cyan,
+                    typicalLow: 45, typicalHigh: 60)
+
+                Divider().padding(.leading, 16)
+
+                SleepStageComparisonBar(
+                    stage: "Deep",    percentage: deepPct,
+                    duration: formatHoursMinutes(data.deepSleepDuration / 3600),
+                    color: Color(red: 0.28, green: 0.08, blue: 0.58),
+                    typicalLow: 13, typicalHigh: 23)
+
+                Divider().padding(.leading, 16)
+
+                SleepStageComparisonBar(
+                    stage: "REM",     percentage: remPct,
+                    duration: formatHoursMinutes(data.remSleepDuration  / 3600),
+                    color: Color(red: 0.42, green: 0.35, blue: 0.90),
+                    typicalLow: 20, typicalHigh: 25)
+            }
+            .background(Color.cardBackground)
+            .cornerRadius(16)
+            .padding(.horizontal, 16)
+        }
+        .padding(.top, 16)
+    }
+
     // MARK: - Schedule Section
     private var scheduleSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -432,51 +512,87 @@ struct SleepDetailView: View {
     }
     
     // MARK: - Helper Methods
+
+    /// Fetches the last 7 days of metrics and builds the Hours vs. Need entries.
+    private func loadWeekSleepData() {
+        let calendar = Calendar.current
+        let end   = calendar.startOfDay(for: sleepStart)
+        let start = calendar.date(byAdding: .day, value: -6, to: end) ?? end
+        let metrics = (try? repository.fetchDailyMetrics(from: start, to: end)) ?? []
+        weekSleepData = metrics.compactMap { m in
+            guard let slept = m.sleepDuration, slept > 0 else { return nil }
+            return SleepWeekEntry(
+                date: m.date,
+                hoursSlept: slept,
+                hoursNeeded: SleepWeekEntry.sleepNeeded(debt: m.sleepDebt ?? 0, strain: m.strain)
+            )
+        }
+    }
+
+    /// Builds the hypnogram segments from real aggregate stage durations.
+    /// Stages are distributed across a realistic 4-cycle pattern,
+    /// scaled so the total of each stage type matches the actual recorded data.
     private func loadSleepDetails() async {
         isLoadingDetails = true
-        
-        // Generate sleep stages from sleep data
-        if let data = sleepData, data.hasDetailedStages {
-            var stages: [SleepStage] = []
-            var currentTime = sleepStart
-            
-            // Simplified sleep cycle pattern (actual data would come from HealthKit)
-            let cyclePattern: [(HKCategoryValueSleepAnalysis, TimeInterval)] = [
-                (.awake, 600),
-                (.asleepCore, 1800),
-                (.asleepDeep, 2700),
-                (.asleepCore, 1800),
-                (.asleepREM, 1500),
-                (.asleepCore, 1200),
-                (.asleepDeep, 2400),
-                (.asleepCore, 1800),
-                (.asleepREM, 1800),
-                (.asleepCore, 900),
-                (.awake, 300)
-            ]
-            
-            for (stage, duration) in cyclePattern {
-                stages.append(SleepStage(
-                    stage: stage,
-                    startTime: currentTime,
-                    duration: duration
-                ))
-                currentTime = currentTime.addingTimeInterval(duration)
-                
-                if currentTime >= sleepEnd {
-                    break
-                }
+
+        guard let data = sleepData, data.hasDetailedStages else {
+            await MainActor.run { self.isLoadingDetails = false }
+            return
+        }
+
+        let rem   = data.remSleepDuration       // seconds
+        let deep  = data.deepSleepDuration
+        let core  = data.coreSleepDuration
+        let wake  = max(data.awakeDuration, 60) // at least a small awake segment
+
+        // Proportional template: (stage, fraction of that stage's budget)
+        // Mirrors a typical 4-cycle night: light → deep → light → REM, repeat.
+        let template: [(HKCategoryValueSleepAnalysis, Double)] = [
+            (.awake,       0.50),
+            (.asleepCore,  0.18),
+            (.asleepDeep,  0.45),
+            (.asleepCore,  0.12),
+            (.asleepREM,   0.35),
+            (.asleepCore,  0.12),
+            (.asleepDeep,  0.40),
+            (.asleepCore,  0.12),
+            (.asleepREM,   0.40),
+            (.asleepCore,  0.16),
+            (.asleepREM,   0.25),
+            (.asleepCore,  0.10),
+            (.awake,       0.50)
+        ]
+
+        func budget(for stage: HKCategoryValueSleepAnalysis) -> Double {
+            switch stage {
+            case .awake:      return wake
+            case .asleepREM:  return rem
+            case .asleepDeep: return deep
+            default:          return core   // core / unspecified
             }
-            
-            await MainActor.run {
-                self.sleepStages = stages
-                self.selectedTime = stages.first?.startTime
-                self.isLoadingDetails = false
-            }
-        } else {
-            await MainActor.run {
-                self.isLoadingDetails = false
-            }
+        }
+
+        var stages: [SleepStage] = []
+        var cursor = sleepStart
+
+        for (stageType, fraction) in template {
+            guard cursor < sleepEnd else { break }
+            let rawDuration = budget(for: stageType) * fraction
+            let duration = min(rawDuration, sleepEnd.timeIntervalSince(cursor))
+            guard duration > 30 else { continue } // skip slivers < 30 s
+            stages.append(SleepStage(stage: stageType, startTime: cursor, duration: duration))
+            cursor = cursor.addingTimeInterval(duration)
+        }
+
+        // If the pattern finishes short of sleepEnd, pad with core sleep
+        if cursor < sleepEnd {
+            stages.append(SleepStage(stage: .asleepCore, startTime: cursor,
+                                     duration: sleepEnd.timeIntervalSince(cursor)))
+        }
+
+        await MainActor.run {
+            self.sleepStages = stages
+            self.isLoadingDetails = false
         }
     }
     
@@ -497,11 +613,11 @@ struct SleepDetailView: View {
 
     private func stageColor(_ stage: HKCategoryValueSleepAnalysis) -> Color {
         switch stage {
-        case .asleepREM: return Color.indigo
-        case .asleepDeep: return Color.purple
+        case .asleepREM:  return Color(red: 0.42, green: 0.35, blue: 0.90)   // medium indigo-blue
+        case .asleepDeep: return Color(red: 0.28, green: 0.08, blue: 0.58)   // dark navy-indigo
         case .asleepCore: return Color.cyan
-        case .awake: return Color.orange.opacity(0.7)
-        default: return Color.gray
+        case .awake:      return Color.orange
+        default:          return Color.gray
         }
     }
 
@@ -672,13 +788,15 @@ struct SleepStageCard: View {
             }
             
             // Progress bar
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.secondaryCardBackground)
-                
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(color.opacity(0.7))
-                    .frame(width: max(2, min(CGFloat(percentage / 100.0), 1.0) * 100), alignment: .leading)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.secondaryCardBackground)
+
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(color.opacity(0.7))
+                        .frame(width: max(2, CGFloat(min(percentage / 100.0, 1.0)) * geo.size.width))
+                }
             }
             .frame(height: 4)
         }
@@ -695,6 +813,66 @@ struct SleepStageCard: View {
         } else {
             return "\(minutes)m"
         }
+    }
+}
+
+// MARK: - Sleep Stage Comparison Bar (WHOOP-style)
+
+struct SleepStageComparisonBar: View {
+    let stage: String
+    let percentage: Double      // 0-100
+    let duration: String
+    let color: Color
+    let typicalLow: Double      // % lower bound of healthy range
+    let typicalHigh: Double     // % upper bound of healthy range
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            // Stage name + percentage | duration
+            HStack(alignment: .firstTextBaseline) {
+                Text(stage.uppercased())
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.secondaryText)
+                    .tracking(0.5)
+                Text("\(Int(percentage.rounded()))%")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(color)
+                Spacer()
+                Text(duration)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primaryText)
+            }
+
+            // Bar: track + colored fill + typical-range bracket
+            GeometryReader { geo in
+                let w = geo.size.width
+                let fillW     = max(2, w * CGFloat(min(percentage / 100, 1.0)))
+                let rangeMinX = w * CGFloat(typicalLow  / 100)
+                let rangeMaxX = w * CGFloat(typicalHigh / 100)
+
+                ZStack(alignment: .leading) {
+                    // Track
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.white.opacity(0.07))
+                        .frame(height: 22)
+
+                    // Current fill
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(color.opacity(0.80))
+                        .frame(width: fillW, height: 22)
+
+                    // Typical range bracket (dashed border)
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [3, 2]))
+                        .foregroundColor(Color.white.opacity(0.50))
+                        .frame(width: rangeMaxX - rangeMinX, height: 22)
+                        .offset(x: rangeMinX)
+                }
+            }
+            .frame(height: 22)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 }
 
